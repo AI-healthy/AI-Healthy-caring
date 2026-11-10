@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from uuid import uuid4
+
 from fastapi import FastAPI
+
 from .recommendation import get_recommendations
 from .schemas import (
     FeedbackRequest,

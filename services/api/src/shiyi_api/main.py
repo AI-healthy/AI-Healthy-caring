@@ -1,0 +1,57 @@
+from __future__ import annotations
+from uuid import uuid4
+from fastapi import FastAPI
+from .recommendation import get_recommendations
+from .schemas import (
+    FeedbackRequest,
+    FeedbackResponse,
+    RecommendationRequest,
+    RecommendationResponse,
+)
+
+app = FastAPI(
+    title="ShiYi API (development starter)",
+    description="Local demo endpoints only. No authentication or health-data persistence.",
+    version="0.1.0",
+)
+
+_demo_seen_events: set[str] = set()
+
+
+@app.get("/api/v1/health")
+def health() -> dict:
+    return {"status": "ok", "mode": "local_demo", "service": "shiyi-api"}
+
+
+@app.get("/api/v1/seasons/current")
+def current_season() -> dict:
+    # Example card, NOT a verified solar-term calendar implementation.
+    return {
+        "term": "立冬",
+        "title": "四时生活 · 立冬",
+        "summary": "了解当季习俗，探索适合自己的生活小体验。",
+        "suggested_experience": "认识一种家乡冬季饮食文化",
+        "calendar_status": "sample_only",
+        "is_demo": True,
+        "notice": "示例主题；未按当前日期查询精确节气历。",
+    }
+
+
+@app.post("/api/v1/recommendations", response_model=RecommendationResponse)
+def recommend(payload: RecommendationRequest) -> RecommendationResponse:
+    return RecommendationResponse(
+        request_id=str(uuid4()),
+        options=get_recommendations(payload),
+        explanation="活动由演示规则排序，不进行疾病判断。",
+        is_demo=True,
+        data_notice="规则推荐演示，不代表穿戴数据已经接入。",
+    )
+
+
+@app.post("/api/v1/activities/feedback", response_model=FeedbackResponse)
+def feedback(payload: FeedbackRequest) -> FeedbackResponse:
+    duplicate = payload.client_event_id in _demo_seen_events
+    _demo_seen_events.add(payload.client_event_id)
+    return FeedbackResponse(
+        accepted=True, event_id=payload.client_event_id, duplicate=duplicate,
+    )

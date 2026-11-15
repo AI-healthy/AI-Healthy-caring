@@ -187,3 +187,9 @@ def revoke_simulator(store, user, device_id):
                    WHERE user_id=? AND device_id=? AND status IN ('QUEUED','ACKNOWLEDGED')""",
                 (user, device_id),
             )
+            db.execute(
+                """UPDATE harness_runs SET status='INVALIDATED'
+                   WHERE user_id=? AND status='AWAITING_CONFIRMATION' AND run_id IN
+                   (SELECT run_id FROM proactive_offers WHERE user_id=? AND device_id=?)""",
+                (user, user, device_id),
+            )

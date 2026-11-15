@@ -50,3 +50,5 @@ uvicorn shiyi_api.main:app --reload --port 8000
 可选本机模型排序：[MODEL_ADAPTER.md](docs/MODEL_ADAPTER.md)（默认关闭，规则回退，不接收真实健康数据）。
 
 记忆检索与隐私控制：[MEMORY_HARNESS.md](docs/MEMORY_HARNESS.md)（V0.7 合成数据）。
+
+主动陪伴调度与模拟邀请：[PROACTIVE_HARNESS.md](docs/PROACTIVE_HARNESS.md)（需要独立启动本地 worker；不实际推送）。

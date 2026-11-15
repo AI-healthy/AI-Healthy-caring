@@ -144,16 +144,20 @@ def _energy(db, user, settings, payload, now):
     return None, "missing_observation"
 
 
-def _proactive_reason(db, user, settings, now):
-    if not settings.proactive_enabled:
-        return "proactive_disabled"
+def is_quiet(settings, now):
     local = now.astimezone(ZoneInfo(settings.timezone)).time()
     start, end = settings.quiet_start, settings.quiet_end
-    if start == end or (
+    return start == end or (
         start < end and start <= local < end
     ) or (
         start > end and (local >= start or local < end)
-    ):
+    )
+
+
+def _proactive_reason(db, user, settings, now):
+    if not settings.proactive_enabled:
+        return "proactive_disabled"
+    if is_quiet(settings, now):
         return "quiet_hours"
     times = db.execute(
         """SELECT created_at FROM harness_runs WHERE user_id=? AND trigger='scheduled_check'
@@ -302,17 +306,31 @@ def create_run(store, user, payload, ranker=None):
             # Replan deterministically using fresh server data; never call a model here.
             data = _decide(latest, None)
             data["trace"].append({"stage": "revalidation", "result": "context_changed_replanned"})
-        status = "AWAITING_CONFIRMATION" if data["options"] else "NO_ACTION"
-        run_id = str(uuid4())
-        db.execute(
-            """INSERT INTO harness_runs
-               (run_id,user_id,client_request_id,request_digest,trigger,status,plan_json,
-                created_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)""",
-            (run_id, user, payload.client_request_id, digest, payload.trigger,
-             status, json.dumps(data, ensure_ascii=False),
-             storage.stamp(now), storage.stamp(now + timedelta(minutes=10))),
-        )
-        return _view(_row(db, user, run_id, now))
+        return _persist_plan(db, user, payload, data, now, digest=digest)
+
+
+def _persist_plan(db, user, payload, data, now, *, digest=None, deadline=None):
+    status = "AWAITING_CONFIRMATION" if data["options"] else "NO_ACTION"
+    run_id = str(uuid4())
+    expires_at = now + timedelta(minutes=10)
+    if deadline is not None:
+        expires_at = min(expires_at, deadline)
+    if digest is None:
+        digest = hashlib.sha256(payload.model_dump_json().encode()).hexdigest()
+    db.execute(
+        """INSERT INTO harness_runs
+           (run_id,user_id,client_request_id,request_digest,trigger,status,plan_json,
+            created_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?)""",
+        (run_id, user, payload.client_request_id, digest, payload.trigger,
+         status, json.dumps(data, ensure_ascii=False),
+         storage.stamp(now), storage.stamp(expires_at)),
+    )
+    return _view(_row(db, user, run_id, now))
+
+
+def persist_plan(db, user, payload, data, now, *, deadline=None):
+    """Internal local scheduler entry point; caller owns the transaction."""
+    return _persist_plan(db, user, payload, data, now, deadline=deadline)
 
 
 def get_run(store, user, run_id):

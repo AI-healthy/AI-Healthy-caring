@@ -1,9 +1,9 @@
-# ShiYi Agent Harness V0.7 · 授权记忆检索与受约束决策
+# ShiYi Agent Harness V0.8 · 主动陪伴调度与授权记忆
 
 这是有界、结构化智能体运行框架，允许可选本机模型参与候选排序，不是通用聊天系统。所有输入为合成测试数据。
 模块：harness/contracts.py、engine.py、repository.py、api.py。xu 维护运行时与工具边界，
 fu 可在可信本地代码中实现 Ranker.rank(context, candidates)；默认规则，不要求 API key。
-当前不执行外部云 LLM/RAG、后台常驻调度或真实机器人指令；MCP 仍保留无身份的只读演示工具。
+当前不执行外部云 LLM/RAG、云端推送或真实机器人指令；MCP 仍保留无身份的只读演示工具。
 
 ## 决策循环
 
@@ -28,7 +28,7 @@ fu 可在可信本地代码中实现 Ranker.rank(context, candidates)；默认�
 - scheduled_check 仅生成主动陪伴建议（非通知送达）：默认关闭；时区默认 Asia/Shanghai；
   默认勿扰 22:00–08:00、至少4小时冷却、滚动24小时最多2次建议。
   等值勿扰起止视为全天勿扰；有未过期的活动或待确认方案时不生成主动建议；主动请求不受勿扰限制。计数按已生成建议而非通知送达；
-  状态返回 NO_ACTION 时不要发送通知。没有后台 worker，需要客户端主动调用评估。
+  状态返回 NO_ACTION 时不要发送通知。V0.8 新增本地可手动启动的独立 worker、限时可用声明与邀请收件箱；见 [PROACTIVE_HARNESS.md](PROACTIVE_HARNESS.md)。
 - 持久化运行记录：状态、候选、有限 trace、时间、请求去重摘要；不保存原始自评或完整上下文。
   trace 是可检查的阶段结果而非模型思维链。仅合成数据，摘要不作为隐私保证。
   历史运行记录尚无保留清理/账号删除功能。
@@ -69,7 +69,7 @@ bash scripts/demo_backend.sh 从真实本地 HTTP 走完整登录、Harness 规�
 单元/HTTP 测试检查授权、缺失/陈旧记录、自评优先、记忆开关、排序回退、确认幂等、
 用户隔离、过期、撤销导致失效、主动陪伴勿扰和冷却。后续需与 fu 评审决策契约、
 与 wu 联调用户确认，与 lan 验证实际设备。拟议后续：经审核的 RAG 工具、异步模型适配器、
-独立用户授权的设备端工具、主动提醒 worker/投递幂等、保留删除策略及对照实验。
+独立用户授权的设备端工具、真实通知渠道/投递幂等、保留删除策略及对照实验。
 
 本机 LLM、工具路由、预算与威胁边界详见 [MODEL_ADAPTER.md](MODEL_ADAPTER.md)。
 

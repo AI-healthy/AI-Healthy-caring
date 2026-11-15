@@ -47,3 +47,5 @@ ACK 与完成/失败事件按事件 ID 去重。活动完成由用户确认，�
 V0.6：Harness settings 增加 use_local_model（默认 false），run.algorithm 可能为 local_llm_v1 或 rules_v1_fallback。见 [MODEL_ADAPTER.md](../../docs/MODEL_ADAPTER.md)。
 
 V0.7：settings 新增 use_behavior_memory 与 memory_budget；GET /api/v1/harness/memory 可按 available_minutes 过滤；POST /api/v1/harness/memory/reset 重置检索窗口，不删除业务记录。见 [MEMORY_HARNESS.md](../../docs/MEMORY_HARNESS.md)。
+
+V0.8：/api/v1/proactive/schedule、/offers/pending、/offers/{offer_id}/ack 与 /devices/{device_id}/pending、/devices/{device_id}/offers/{offer_id}/ack。邀请收执不是用户确认或真实设备动作，见 [PROACTIVE_HARNESS.md](../../docs/PROACTIVE_HARNESS.md)。

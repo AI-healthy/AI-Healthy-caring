@@ -4,21 +4,20 @@ from uuid import uuid4
 
 from fastapi import FastAPI
 
+from .activity_api import router as activity_router
 from .recommendation import get_recommendations
 from .schemas import (
-    FeedbackRequest,
-    FeedbackResponse,
     RecommendationRequest,
     RecommendationResponse,
 )
 
 app = FastAPI(
-    title="ShiYi API (development starter)",
-    description="Local demo endpoints only. No authentication or health-data persistence.",
-    version="0.1.0",
+    title="ShiYi API (local activity MVP)",
+    description="Local demo only. Activity records use SQLite and development bearer identities.",
+    version="0.2.0",
 )
 
-_demo_seen_events: set[str] = set()
+app.include_router(activity_router)
 
 
 @app.get("/api/v1/health")
@@ -50,11 +49,3 @@ def recommend(payload: RecommendationRequest) -> RecommendationResponse:
         data_notice="规则推荐演示，不代表穿戴数据已经接入。",
     )
 
-
-@app.post("/api/v1/activities/feedback", response_model=FeedbackResponse)
-def feedback(payload: FeedbackRequest) -> FeedbackResponse:
-    duplicate = payload.client_event_id in _demo_seen_events
-    _demo_seen_events.add(payload.client_event_id)
-    return FeedbackResponse(
-        accepted=True, event_id=payload.client_event_id, duplicate=duplicate,
-    )

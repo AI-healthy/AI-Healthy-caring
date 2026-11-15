@@ -1,3 +1,4 @@
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,6 +8,7 @@ from ..storage import SessionStore, StoreError, get_store
 from . import repository
 from .contracts import ConfirmResult, MemoryView, RunRequest, RunView, Selection, Settings
 from .engine import Ranker
+from .model_adapter import LocalModelRanker
 
 router = APIRouter(prefix="/api/v1/harness", tags=["agent-harness"])
 User = Annotated[str, Depends(current_user)]
@@ -14,7 +16,9 @@ Store = Annotated[SessionStore, Depends(get_store)]
 
 
 def get_ranker() -> Ranker | None:
-    """Trusted local strategy dependency; HTTP clients cannot select executable code."""
+    """Server-only strategy configuration; model use also requires user opt-in."""
+    if os.environ.get("SHIYI_RANKER", "rules") == "local_llm":
+        return LocalModelRanker.from_environment()
     return None
 
 

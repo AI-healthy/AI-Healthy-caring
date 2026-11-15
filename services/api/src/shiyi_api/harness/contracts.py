@@ -19,6 +19,7 @@ class Settings(BaseModel):
 
     use_observations: bool = False
     use_feedback_memory: bool = False
+    use_local_model: bool = False
     preference_tags: list[Tag] = Field(default_factory=list, max_length=5)
     blocked_activity_ids: list[str] = Field(default_factory=list, max_length=50)
     proactive_enabled: bool = False

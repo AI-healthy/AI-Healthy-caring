@@ -20,7 +20,7 @@ from .schemas import (
 app = FastAPI(
     title="ShiYi API (local activity MVP)",
     description="Local demo only. Accounts, activities and synthetic observations use SQLite.",
-    version="0.5.0",
+    version="0.6.0",
 )
 
 app.include_router(activity_router)

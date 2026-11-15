@@ -46,3 +46,5 @@ uvicorn shiyi_api.main:app --reload --port 8000
 用户与健康数据接口：[USER_HEALTH_API.md](docs/USER_HEALTH_API.md)（仅合成数据）。
 
 智能体运行框架：[HARNESS.md](docs/HARNESS.md)（本地规则基线与用户确认；无外部模型或自主推送）。
+
+可选本机模型排序：[MODEL_ADAPTER.md](docs/MODEL_ADAPTER.md)（默认关闭，规则回退，不接收真实健康数据）。

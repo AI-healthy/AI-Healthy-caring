@@ -11,12 +11,17 @@ from ..recommendation import catalog_entries, get_activity
 from ..storage import StoreError
 from .contracts import MemoryEntry, MemoryView, RunView, Settings, Trace
 from .engine import DecisionContext, RuleRanker, choose
+from .model_adapter import LocalModelRanker
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS harness_settings (
     user_id TEXT PRIMARY KEY,
     payload_json TEXT NOT NULL,
     memory_since TEXT
+);
+CREATE TABLE IF NOT EXISTS harness_context_versions (
+    user_id TEXT PRIMARY KEY,
+    revision INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS harness_runs (
     run_id TEXT PRIMARY KEY,
@@ -51,6 +56,11 @@ def get_settings(store, user):
 
 
 def invalidate_pending(db, user):
+    # Revision also invalidates inference whose plan is not yet persisted.
+    db.execute(
+        """INSERT INTO harness_context_versions VALUES (?,1)
+           ON CONFLICT(user_id) DO UPDATE SET revision=revision+1""", (user,)
+    )
     db.execute(
         """UPDATE harness_runs SET status='INVALIDATED'
            WHERE user_id=? AND status='AWAITING_CONFIRMATION'""", (user,)
@@ -193,57 +203,103 @@ def _trace(stage, result):
     return Trace(stage=stage, result=result)
 
 
+def _existing_run(db, user, payload, digest, now):
+    existing = db.execute(
+        "SELECT * FROM harness_runs WHERE user_id=? AND client_request_id=?",
+        (user, payload.client_request_id),
+    ).fetchone()
+    if existing:
+        if existing["request_digest"] != digest:
+            raise StoreError(409, "Harness request ID reused with different input")
+        return _view(_row(db, user, existing["run_id"], now))
+    return None
+
+
+def _snapshot(db, user, payload, now):
+    settings, since = _settings(db, user)
+    revision = db.execute("SELECT revision FROM harness_context_versions WHERE user_id=?",
+                          (user,)).fetchone()
+    trace = [_trace("intent", payload.trigger)]
+    reason = None
+    if payload.availability != "ready":
+        reason = "user_unavailable"
+    elif payload.trigger == "scheduled_check":
+        reason = _proactive_reason(db, user, settings, now)
+    context = None
+    entries = ()
+    if not reason:
+        energy, source = _energy(db, user, settings, payload, now)
+        trace.append(_trace("perception", source))
+        memory = _memory(db, user, settings, since, now)
+        trace.append(_trace("memory", "enabled" if settings.use_feedback_memory else "disabled"))
+        excluded = set(settings.blocked_activity_ids) | set(payload.skip_activity_ids)
+        entries = tuple(e for e in catalog_entries()
+                        if e[0] not in excluded and e[2] <= payload.available_minutes)
+        trace.append(_trace("candidates", str(len(entries))))
+        if not entries:
+            reason = "no_eligible_activity"
+        else:
+            context = DecisionContext(
+                available_minutes=payload.available_minutes, energy_level=energy,
+                preference_tags=frozenset(settings.preference_tags),
+                memory_scores=tuple((m.activity_id, m.score) for m in memory),
+            )
+    return (settings, since, revision["revision"] if revision else 0,
+            reason, trace, entries, context)
+
+
+def _decide(snapshot, ranker):
+    settings, _since, _revision, reason, trace, entries, context = snapshot
+    trace = list(trace)
+    options = []
+    algorithm = "none"
+    if reason:
+        trace.append(_trace("gate", reason))
+    else:
+        if isinstance(ranker, LocalModelRanker) and not settings.use_local_model:
+            trace.append(_trace("model", "opt_in_disabled"))
+            ranker = None
+        options, fallback = choose(context, entries, ranker if ranker is not None else RuleRanker())
+        if fallback:
+            algorithm = "rules_v1_fallback"
+        elif isinstance(ranker, LocalModelRanker):
+            algorithm = "local_llm_v1"
+        else:
+            algorithm = "rules_v1" if ranker is None else "adapter_v1"
+        trace.append(_trace("decision", algorithm))
+        trace.append(_trace("gate", "user_confirmation_required"))
+        reason = "awaiting_user_choice"
+    return {
+        "algorithm": algorithm, "options": [x.model_dump() for x in options],
+        "trace": [x.model_dump() for x in trace], "reason": reason,
+    }
+
+
 def create_run(store, user, payload, ranker=None):
     digest = hashlib.sha256(payload.model_dump_json().encode()).hexdigest()
+    # Phase 1: short, consistent snapshot. Never run a strategy under the write lock.
     with store.transaction() as db:
         now = storage.now_utc()
-        existing = db.execute(
-            "SELECT * FROM harness_runs WHERE user_id=? AND client_request_id=?",
-            (user, payload.client_request_id),
-        ).fetchone()
+        existing = _existing_run(db, user, payload, digest, now)
         if existing:
-            if existing["request_digest"] != digest:
-                raise StoreError(409, "Harness request ID reused with different input")
-            return _view(_row(db, user, existing["run_id"], now))
-        settings, since = _settings(db, user)
-        trace = [_trace("intent", payload.trigger)]
-        reason = None
-        if payload.availability != "ready":
-            reason = "user_unavailable"
-        elif payload.trigger == "scheduled_check":
-            reason = _proactive_reason(db, user, settings, now)
-        options = []
-        algorithm = "none"
-        if reason:
-            trace.append(_trace("gate", reason))
-        else:
-            energy, source = _energy(db, user, settings, payload, now)
-            trace.append(_trace("perception", source))
-            memory = _memory(db, user, settings, since, now)
-            trace.append(_trace("memory", "enabled" if settings.use_feedback_memory else "disabled"))
-            excluded = set(settings.blocked_activity_ids) | set(payload.skip_activity_ids)
-            entries = tuple(e for e in catalog_entries()
-                            if e[0] not in excluded and e[2] <= payload.available_minutes)
-            trace.append(_trace("candidates", str(len(entries))))
-            if not entries:
-                reason = "no_eligible_activity"
-                trace.append(_trace("gate", reason))
-            else:
-                context = DecisionContext(
-                    available_minutes=payload.available_minutes, energy_level=energy,
-                    preference_tags=frozenset(settings.preference_tags),
-                    memory_scores=tuple((m.activity_id, m.score) for m in memory),
-                )
-                options, fallback = choose(context, entries, ranker or RuleRanker())
-                algorithm = "rules_v1_fallback" if fallback else (
-                    "rules_v1" if ranker is None else "adapter_v1"
-                )
-                trace.append(_trace("decision", algorithm))
-                trace.append(_trace("gate", "user_confirmation_required"))
-                reason = "awaiting_user_choice"
-        status = "AWAITING_CONFIRMATION" if options else "NO_ACTION"
-        data = {"algorithm": algorithm, "options": [x.model_dump() for x in options],
-                "trace": [x.model_dump() for x in trace], "reason": reason}
+            return existing
+        snapshot = _snapshot(db, user, payload, now)
+
+    # Phase 2: untrusted proposal outside the transaction, or local rules.
+    data = _decide(snapshot, ranker)
+
+    # Phase 3: re-check the latest context and idempotency before committing.
+    with store.transaction() as db:
+        now = storage.now_utc()
+        existing = _existing_run(db, user, payload, digest, now)
+        if existing:
+            return existing
+        latest = _snapshot(db, user, payload, now)
+        if latest != snapshot:
+            # Replan deterministically using fresh server data; never call a model here.
+            data = _decide(latest, None)
+            data["trace"].append({"stage": "revalidation", "result": "context_changed_replanned"})
+        status = "AWAITING_CONFIRMATION" if data["options"] else "NO_ACTION"
         run_id = str(uuid4())
         db.execute(
             """INSERT INTO harness_runs

@@ -43,3 +43,5 @@ ACK 与完成/失败事件按事件 ID 去重。活动完成由用户确认，�
 
 ## Agent Harness（V0.5）
 /api/v1/harness/settings、memory、runs、runs/{run_id}/confirm、runs/{run_id}/dismiss。用户确认只创建活动，不启动设备；详见 [HARNESS.md](../../docs/HARNESS.md)。
+
+V0.6：Harness settings 增加 use_local_model（默认 false），run.algorithm 可能为 local_llm_v1 或 rules_v1_fallback。见 [MODEL_ADAPTER.md](../../docs/MODEL_ADAPTER.md)。

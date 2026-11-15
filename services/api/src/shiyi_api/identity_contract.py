@@ -30,3 +30,21 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     expires_at: AwareDatetime
     user: Profile
+
+
+class SimulatorCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=40)
+
+
+class SimulatorView(BaseModel):
+    device_id: str
+    name: str
+    created_at: AwareDatetime
+    revoked_at: AwareDatetime | None
+
+
+class SimulatorCredential(BaseModel):
+    device: SimulatorView
+    device_token: str

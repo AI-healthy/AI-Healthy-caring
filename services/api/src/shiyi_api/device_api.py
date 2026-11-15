@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
+from . import identity_storage
 from .auth import bearer, current_user
 from .device_contract import CommandRequest, CommandView, DeviceEvent, Receipt
 from .device_storage import enqueue, get_command, pending, record_event
@@ -27,10 +28,12 @@ def configured_devices():
         for device_id, entry in devices.items():
             if (
                 not isinstance(device_id, str) or not 0 < len(device_id) <= 80
+                or device_id.startswith("sim_")
                 or not isinstance(entry, dict) or set(entry) != {"user_id", "token"}
                 or not isinstance(entry["user_id"], str) or entry["user_id"] not in users
                 or not isinstance(entry["token"], str) or len(entry["token"]) < 16
                 or entry["token"] in users.values() or entry["token"] in tokens
+                or entry["token"].startswith(("simtok_", "shiyi_"))
             ):
                 raise ValueError
             tokens.add(entry["token"])
@@ -40,9 +43,17 @@ def configured_devices():
 
 
 def current_device(
-    device_id: str,
+    device_id: str, store: Store,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> str:
+    if device_id.startswith("sim_"):
+        owner = identity_storage.simulator_owner(
+            store, device_id, credentials.credentials if credentials else ""
+        )
+        if owner is not None:
+            return owner
+        raise HTTPException(401, "Invalid device credential",
+                            headers={"WWW-Authenticate": "Bearer"})
     entry = configured_devices().get(device_id)
     if (
         entry is None or credentials is None
@@ -56,7 +67,11 @@ def current_device(
 DeviceOwner = Annotated[str, Depends(current_device)]
 
 
-def check_owner(user: str, device_id: str):
+def check_owner(store: SessionStore, user: str, device_id: str, active=True):
+    if device_id.startswith("sim_"):
+        if not identity_storage.simulator_owned(store, user, device_id, active):
+            raise HTTPException(404, "Device not found")
+        return
     entry = configured_devices().get(device_id)
     if entry is None or entry["user_id"] != user:
         raise HTTPException(404, "Device not found")
@@ -71,14 +86,14 @@ def invoke(operation, *args):
 
 @router.post("/commands", response_model=CommandView)
 def create_command(payload: CommandRequest, user: User, store: Store):
-    check_owner(user, payload.device_id)
+    check_owner(store, user, payload.device_id)
     return invoke(enqueue, store, user, payload)
 
 
 @router.get("/commands/{command_id}", response_model=CommandView)
 def command_status(command_id: str, user: User, store: Store):
     result = invoke(get_command, store, user, command_id)
-    check_owner(user, result.device_id)
+    check_owner(store, user, result.device_id, active=False)
     return result
 
 

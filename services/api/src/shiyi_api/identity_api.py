@@ -11,6 +11,9 @@ from .identity_contract import (
     Profile,
     ProfileUpdate,
     RegisterRequest,
+    SimulatorCreate,
+    SimulatorCredential,
+    SimulatorView,
 )
 from .storage import SessionStore, StoreError, get_store
 
@@ -52,3 +55,18 @@ def get_me(user: User, store: Store):
 @router.patch("/me", response_model=Profile)
 def update_me(payload: ProfileUpdate, user: User, store: Store):
     return call(identity_storage.update_profile, store, user, payload)
+
+
+@router.post("/me/simulated-devices", response_model=SimulatorCredential, status_code=201)
+def create_simulator(payload: SimulatorCreate, user: User, store: Store):
+    return call(identity_storage.create_simulator, store, user, payload)
+
+
+@router.get("/me/simulated-devices", response_model=list[SimulatorView])
+def list_simulators(user: User, store: Store):
+    return call(identity_storage.list_simulators, store, user)
+
+
+@router.delete("/me/simulated-devices/{device_id}", status_code=204)
+def revoke_simulator(device_id: str, user: User, store: Store):
+    call(identity_storage.revoke_simulator, store, user, device_id)

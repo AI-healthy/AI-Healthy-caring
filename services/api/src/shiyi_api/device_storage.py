@@ -59,11 +59,21 @@ def _refresh(db, row, store, now):
                       (row["command_id"],)).fetchone()
 
 
+def _check_active_simulator(db, user, device_id):
+    if device_id.startswith("sim_") and not db.execute(
+        """SELECT 1 FROM registered_simulators
+           WHERE user_id=? AND device_id=? AND revoked_at IS NULL""",
+        (user, device_id),
+    ).fetchone():
+        raise StoreError(404, "Simulator not active")
+
+
 def enqueue(store, user, payload: CommandRequest):
     now = storage.now_utc()
     problem = None
     result = None
     with store.transaction() as db:
+        _check_active_simulator(db, user, payload.device_id)
         row = db.execute(
             "SELECT * FROM device_commands WHERE user_id=? AND client_request_id=?",
             (user, payload.client_request_id),
@@ -109,6 +119,7 @@ def get_command(store, user, command_id):
 
 def pending(store, owner, device_id):
     with store.transaction() as db:
+        _check_active_simulator(db, owner, device_id)
         rows = db.execute(
             """SELECT * FROM device_commands WHERE user_id=? AND device_id=?
                AND status IN ('QUEUED','ACKNOWLEDGED') ORDER BY created_at, command_id""",
@@ -128,6 +139,7 @@ def record_event(store, owner, event: DeviceEvent):
     payload = event.model_dump_json()
     now = storage.now_utc()
     with store.transaction() as db:
+        _check_active_simulator(db, owner, event.device_id)
         row = db.execute(
             "SELECT * FROM device_commands WHERE user_id=? AND device_id=? AND command_id=?",
             (owner, event.device_id, event.command_id),

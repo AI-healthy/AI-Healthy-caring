@@ -139,3 +139,36 @@ def test_schema_provenance_and_missing_values(client):
     assert upload(client, auth, sample(client_sample_id="steps-2")).status_code == 200
     page = client.get(HEALTH + "/observations?limit=1", headers=auth).json()
     assert page["next_offset"] == 1
+
+
+def test_registered_account_simulator_binding(client):
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    path = USERS + "/me/simulated-devices"
+    result = client.post(path, headers=auth, json={"name": "Synthetic StackChan"})
+    assert result.status_code == 201, result.text
+    record = result.json()
+    did = record["device"]["device_id"]
+    device_auth = {"Authorization": "Bearer " + record["device_token"]}
+    listed = client.get(path, headers=auth).json()
+    assert listed == [record["device"]]
+    assert client.get(path, headers=other).json() == []
+    assert client.get(USERS + "/me", headers=device_auth).status_code == 401
+    session = client.post("/api/v1/activities/sessions", headers=auth,
+                          json={"activity_id": "stretch"}).json()
+    sid = session["session_id"]
+    assert client.post(f"/api/v1/activities/sessions/{sid}/start",
+                       headers=auth).status_code == 200
+    payload = {"device_id": did, "session_id": sid, "preset": "happy",
+               "client_request_id": "new-account-command"}
+    root = "/api/v1/devices"
+    command = client.post(root + "/commands", headers=auth, json=payload)
+    assert command.status_code == 200, command.text
+    cid = command.json()["command_id"]
+    assert client.get(f"{root}/{did}/pending", headers=device_auth).json()["command_id"] == cid
+    assert client.get(f"{root}/{did}/pending", headers=other).status_code == 401
+    assert client.delete(path + "/" + did, headers=other).status_code == 404
+    assert client.delete(path + "/" + did, headers=auth).status_code == 204
+    assert client.get(f"{root}/{did}/pending", headers=device_auth).status_code == 401
+    assert client.get(root + "/commands/" + cid, headers=auth).json()["status"] == "CANCELLED"
+    assert client.post(root + "/commands", headers=auth, json=payload).status_code == 404

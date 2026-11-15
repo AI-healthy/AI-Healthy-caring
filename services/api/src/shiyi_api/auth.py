@@ -23,7 +23,7 @@ def current_user(
         identities = json.loads(os.environ.get("SHIYI_DEV_USERS", "{}"))
         if not isinstance(identities, dict) or not all(
             isinstance(user, str) and 0 < len(user) <= 80 and not user.startswith("usr_")
-            and isinstance(token, str) and len(token) >= 16 and not token.startswith("shiyi_")
+            and isinstance(token, str) and len(token) >= 16 and not token.startswith(("shiyi_", "simtok_"))
             for user, token in identities.items()
         ) or len(set(identities.values())) != len(identities):
             raise ValueError("Invalid development identities")

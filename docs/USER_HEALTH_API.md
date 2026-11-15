@@ -21,7 +21,7 @@
 随机盐 PBKDF2-HMAC-SHA256 600000 次，令牌随机生成且仅保存 SHA-256 摘要，24 小时过期。
 不要在日志或应用源码记录密码/Token。已登录用户使用 Authorization: Bearer <access_token>，
 已有活动 API 可直接使用该身份。原有 SHIYI_DEV_USERS 供自动化演示保留；usr_ 和 shiyi_ 为保留前缀。
-真实机器人绑定尚未实现，已注册用户不能直接使用旧的预配置模拟设备。
+真实机器人绑定尚未实现，注册账号可创建独立的模拟设备。旧的静态预配置仅用于原有自动化演示。
 
 ## 采集授权
 
@@ -87,3 +87,12 @@ uvicorn shiyi_api.main:app --host 127.0.0.1 --port 8000
 进入 /docs → register → login → Authorize → consent → observations。
 新 API 不读取真实穿戴数据、不自动影响推荐、不外发记录至小智/LLM，
 不安装 Android 或修改固件。后续 Agent Harness 应只通过经过授权的聚合查询读取最小必要数据。
+
+
+## 注册账号的模拟设备
+
+- POST /api/v1/users/me/simulated-devices {"name":"Synthetic StackChan"}：201，返回模拟设备及一次性发放的 device_token。
+- GET /api/v1/users/me/simulated-devices：本人设备列表，不返回令牌。
+- DELETE /api/v1/users/me/simulated-devices/{device_id}：撤销设备令牌，取消未结束命令；204。
+- 可使用该 device_id 和独立令牌运行 shiyi_api.simulator，走已有设备队列流程。
+- sim_、simtok_ 为此模拟协议保留前缀。此功能不是物理 K151 配对，不允许借其控制真实机器人。

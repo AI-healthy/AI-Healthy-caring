@@ -24,6 +24,14 @@ CREATE TABLE IF NOT EXISTS user_tokens (
     expires_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS user_tokens_owner ON user_tokens(user_id);
+CREATE TABLE IF NOT EXISTS registered_simulators (
+    device_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    token_digest TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    revoked_at TEXT
+);
 """
 
 
@@ -113,3 +121,69 @@ def update_profile(store, user, payload):
         if updated.rowcount != 1:
             raise StoreError(404, "Registered account required")
         return profile(db.execute("SELECT * FROM users WHERE user_id=?", (user,)).fetchone())
+
+
+def simulator_view(row):
+    return {key: row[key] for key in ("device_id", "name", "created_at", "revoked_at")}
+
+
+def create_simulator(store, user, payload):
+    if not user.startswith("usr_"):
+        raise StoreError(403, "Registered account required")
+    device_id = "sim_" + uuid4().hex
+    token = "simtok_" + secrets.token_urlsafe(32)
+    now = storage.stamp(storage.now_utc())
+    with store.transaction() as db:
+        db.execute("INSERT INTO registered_simulators VALUES (?,?,?,?,?,NULL)",
+                   (device_id, user, payload.name, token_digest(token), now))
+    return {"device_token": token, "device": {
+        "device_id": device_id, "name": payload.name, "created_at": now, "revoked_at": None,
+    }}
+
+
+def list_simulators(store, user):
+    if not user.startswith("usr_"):
+        raise StoreError(403, "Registered account required")
+    with closing(store.connect()) as db:
+        return [simulator_view(row) for row in db.execute(
+            "SELECT * FROM registered_simulators WHERE user_id=? ORDER BY created_at", (user,)
+        )]
+
+
+def simulator_owner(store, device_id, token):
+    if not token.startswith("simtok_"):
+        return None
+    with closing(store.connect()) as db:
+        row = db.execute(
+            """SELECT user_id FROM registered_simulators
+               WHERE device_id=? AND token_digest=? AND revoked_at IS NULL""",
+            (device_id, token_digest(token)),
+        ).fetchone()
+    return row["user_id"] if row else None
+
+
+def simulator_owned(store, user, device_id, active=True):
+    with closing(store.connect()) as db:
+        row = db.execute(
+            "SELECT revoked_at FROM registered_simulators WHERE user_id=? AND device_id=?",
+            (user, device_id),
+        ).fetchone()
+    return row is not None and (not active or row["revoked_at"] is None)
+
+
+def revoke_simulator(store, user, device_id):
+    with store.transaction() as db:
+        row = db.execute(
+            "SELECT revoked_at FROM registered_simulators WHERE user_id=? AND device_id=?",
+            (user, device_id),
+        ).fetchone()
+        if row is None:
+            raise StoreError(404, "Simulator not found")
+        if row["revoked_at"] is None:
+            db.execute("UPDATE registered_simulators SET revoked_at=? WHERE device_id=?",
+                       (storage.stamp(storage.now_utc()), device_id))
+            db.execute(
+                """UPDATE device_commands SET status='CANCELLED'
+                   WHERE user_id=? AND device_id=? AND status IN ('QUEUED','ACKNOWLEDGED')""",
+                (user, device_id),
+            )

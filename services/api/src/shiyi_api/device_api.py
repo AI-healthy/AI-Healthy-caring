@@ -22,7 +22,7 @@ def configured_devices():
         devices = json.loads(os.environ.get("SHIYI_DEV_DEVICES", "{}"))
         users = json.loads(os.environ.get("SHIYI_DEV_USERS", "{}"))
         if not isinstance(devices, dict) or not isinstance(users, dict):
-            raise ValueError
+            raise TypeError
         tokens = set()
         for device_id, entry in devices.items():
             if (

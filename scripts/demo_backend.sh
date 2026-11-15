@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../services/api"
 if [[ ! -d .venv ]]; then python3 -m venv .venv; fi
 source .venv/bin/activate
-python -m pip install -e '.[dev]'
+python -m pip install -e '.[dev,mcp]'
 TMP="$(mktemp -d)"
 PID=""
 cleanup() {
@@ -59,4 +59,41 @@ with httpx.Client(base_url="http://127.0.0.1:8000", timeout=5) as c:
     feedback = post("/api/v1/activities/feedback", {"session_id":sid,"activity_id":aid,"completed":True,"client_event_id":"demo-feedback"})
     assert feedback["accepted"]
     print("SIMULATED E2E PASS: recommendation -> start -> device ACK/completed -> user completion -> feedback")
+PY
+
+python - <<'PY'
+import asyncio
+import sys
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+async def verify():
+    params = StdioServerParameters(
+        command=sys.executable, args=["-m", "shiyi_api.mcp_server"],
+        env={"SHIYI_API_URL":"http://127.0.0.1:8000"},
+    )
+    async with asyncio.timeout(30):
+        async with stdio_client(params) as (reader, writer):
+            async with ClientSession(reader, writer) as session:
+                await session.initialize()
+                tools = await session.list_tools()
+                assert {t.name for t in tools.tools} == {
+                    "get_shiyi_season_card", "recommend_shiyi_activity"
+                }
+                for name, args in (
+                    ("get_shiyi_season_card", {}),
+                    ("recommend_shiyi_activity", {"available_minutes":5}),
+                ):
+                    result = await session.call_tool(name, arguments=args)
+                    assert not result.isError, result
+                    data = result.structuredContent or {}
+                    data = data.get("result", data)
+                    assert data.get("ok") is True and data.get("is_demo") is True, data
+                    if name == "get_shiyi_season_card":
+                        assert data["calendar_status"] == "sample_only"
+                    else:
+                        assert data["options"]
+                print("LOCAL MCP STDIO PASS: tool discovery + 2 live API tool calls")
+
+asyncio.run(verify())
 PY

@@ -107,19 +107,20 @@ class LocalModelRanker:
         try:
             deadline = monotonic() + self.timeout
             # Single attempt; no proxy, redirects, arbitrary host or streamed tool actions.
-            with httpx.Client(timeout=self.timeout, trust_env=False,
-                              follow_redirects=False) as client:
-                with client.stream("POST", self.endpoint, json=body) as response:
-                    response.raise_for_status()
-                    raw = bytearray()
-                    for chunk in response.iter_bytes(chunk_size=1024):
-                        if monotonic() > deadline:
-                            raise TimeoutError("Local inference deadline exceeded")
-                        raw.extend(chunk)
-                        if len(raw) > MAX_RESPONSE_BYTES:
-                            raise ValueError("Model response too large")
+            with (
+                httpx.Client(timeout=self.timeout, trust_env=False, follow_redirects=False) as client,
+                client.stream("POST", self.endpoint, json=body) as response,
+            ):
+                response.raise_for_status()
+                raw = bytearray()
+                for chunk in response.iter_bytes(chunk_size=1024):
                     if monotonic() > deadline:
                         raise TimeoutError("Local inference deadline exceeded")
+                    raw.extend(chunk)
+                    if len(raw) > MAX_RESPONSE_BYTES:
+                        raise ValueError("Model response too large")
+                if monotonic() > deadline:
+                    raise TimeoutError("Local inference deadline exceeded")
             content = json.loads(raw)["choices"][0]["message"]["content"]
             if not isinstance(content, str) or len(content.encode()) > MAX_CONTEXT_BYTES:
                 raise ValueError("Invalid model content")

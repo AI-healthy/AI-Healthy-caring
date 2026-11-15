@@ -49,7 +49,8 @@ def choose(context, candidates, ranker: Ranker):
             or len(set(ids)) != len(ids)
         ):
             raise ValueError("Invalid candidate selection")
-    except Exception:
+    # Adapter boundary: any ordinary strategy exception must fall back safely.
+    except Exception:  # noqa: BLE001
         # Never persist exception contents or user data. Trusted in-process adapters only.
         ids = RuleRanker().rank(context, candidates)
         fallback = True

@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import sqlite3
 from contextlib import closing, contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from uuid import uuid4
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS activity_feedback (
 
 
 def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def stamp(value: datetime) -> str:

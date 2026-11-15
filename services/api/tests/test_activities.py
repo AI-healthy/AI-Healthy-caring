@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +10,7 @@ from shiyi_api.storage import store_for
 ROOT = "/api/v1/activities"
 A = {"Authorization": "Bearer alpha-token-for-tests"}
 B = {"Authorization": "Bearer beta-token-for-tests"}
-BASE_TIME = datetime(2026, 1, 1, tzinfo=timezone.utc)
+BASE_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture

@@ -5,6 +5,7 @@ from uuid import uuid4
 from fastapi import FastAPI
 
 from .activity_api import router as activity_router
+from .device_api import router as device_router
 from .recommendation import get_recommendations
 from .schemas import (
     RecommendationRequest,
@@ -14,10 +15,11 @@ from .schemas import (
 app = FastAPI(
     title="ShiYi API (local activity MVP)",
     description="Local demo only. Activity records use SQLite and development bearer identities.",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 app.include_router(activity_router)
+app.include_router(device_router)
 
 
 @app.get("/api/v1/health")

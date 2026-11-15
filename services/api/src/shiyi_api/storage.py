@@ -63,6 +63,10 @@ class SessionStore:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with closing(self.connect()) as db:
             db.executescript(SCHEMA)
+            # Local import prevents the storage/device module import cycle.
+            from .device_storage import SCHEMA as device_schema
+
+            db.executescript(device_schema)
 
     def connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=5)

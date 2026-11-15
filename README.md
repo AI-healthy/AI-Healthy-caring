@@ -4,12 +4,12 @@
 >
 > 第二十届全国大学生软件创新大赛 · AI + 健康赛道
 
-**状态：工程启动骨架，非可交付产品。** 后端演示接口可运行；Android 尚未实机编译；Stack-chan 固件与健康穿戴数据未接入。
+**状态：本地后端 MVP，非可交付产品。** 活动与反馈 SQLite 持久化、设备模拟 REST、MCP 只读工具；Android、Stack-chan 原生固件与真实穿戴数据尚未经代码联调。
 
 ## 组成
 
 - `apps/android/`：Kotlin + Jetpack Compose，今日／四时／探索／我的
-- `services/api/`：FastAPI、规则推荐、演示节气内容、反馈接口
+- `services/api/`：FastAPI、规则推荐、演示节气内容、持久化活动与反馈、设备模拟接口
 - `firmware/stackchan/`：固件接入边界，待确定硬件版本
 - `packages/contracts/`：跨端设备消息示例
 - `simulators/`：离线 Stack-chan 指令模拟器
@@ -30,8 +30,15 @@ uvicorn shiyi_api.main:app --reload --port 8000
 
 ## 核心闭环
 
-经授权的穿戴记录／主动反馈 → 活动候选 → 用户选择 → Stack-chan 陪伴（未来接入）→ 反馈 → 推荐调整。
+经授权的穿戴记录／主动反馈 → 活动候选 → 用户选择 → Stack-chan 陪伴（模拟协议，真机待接入）→ 反馈 → 推荐调整。
 
 **重要**：本仓库不是医疗诊断、治疗、开方或心理疾病识别系统。演示数据标记 `is_demo`，不得误当真实健康记录。严禁上传个人健康原始数据、音频或云服务密钥。
 
 详见 [架构设计](docs/ARCHITECTURE.md)、[团队规范](docs/CONTRIBUTING.md)、[工作清单](docs/BACKLOG.md)。
+
+
+## 联调
+
+运行 `bash scripts/demo_backend.sh`（仓库根目录，Python 3.11+）验证本地模拟闭环。
+活动 API：[ACTIVITY_API.md](docs/ACTIVITY_API.md)；
+设备模拟与小智 MCP：[INTEGRATION.md](docs/INTEGRATION.md)。

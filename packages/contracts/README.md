@@ -25,3 +25,14 @@
 
 详细字段、错误约定及本地联调见 [活动 API 说明](../../docs/ACTIVITY_API.md)；
 以运行服务的 OpenAPI 为准。设备回执契约仍待 lan 联调确认。
+
+
+## 本地模拟设备命令（0.1-draft）
+
+REST: POST /api/v1/devices/commands; GET /api/v1/devices/commands/{command_id}
+使用开发用户身份。GET /api/v1/devices/{device_id}/pending 与 POST
+/api/v1/devices/{device_id}/events 使用独立设备令牌。当前只允许 SET_EXPRESSION
+三个预设；命令必须绑定运行中的活动会话，60 秒内有效（不超过会话截止）。
+ACK 与完成/失败事件按事件 ID 去重。活动完成由用户确认，不能由机器人表达回执代替。
+所有消息 is_demo=true。这不是 M5Stack 原生协议，也不是生产设备绑定。
+详见 [XU-02 联调指南](../../docs/INTEGRATION.md) 和 OpenAPI。

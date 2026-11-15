@@ -1,7 +1,7 @@
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..auth import current_user
 from ..storage import SessionStore, StoreError, get_store
@@ -43,8 +43,14 @@ def update_settings(payload: Settings, user: User, store: Store):
 
 
 @router.get("/memory", response_model=MemoryView)
-def memory(user: User, store: Store):
-    return call(repository.get_memory, store, user)
+def memory(user: User, store: Store,
+           available_minutes: Annotated[int | None, Query(ge=1, le=120)] = None):
+    return call(repository.get_memory, store, user, available_minutes)
+
+
+@router.post("/memory/reset", response_model=MemoryView)
+def reset_memory(user: User, store: Store):
+    return call(repository.reset_memory, store, user)
 
 
 @router.post("/runs", response_model=RunView)

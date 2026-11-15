@@ -9,8 +9,10 @@ from zoneinfo import ZoneInfo
 from .. import storage
 from ..recommendation import catalog_entries, get_activity
 from ..storage import StoreError
-from .contracts import MemoryEntry, MemoryView, RunView, Settings, Trace
+from .contracts import RunView, Settings, Trace
 from .engine import DecisionContext, RuleRanker, choose
+from .memory import SCHEMA as MEMORY_SCHEMA
+from .memory import advance_epoch, recall
 from .model_adapter import LocalModelRanker
 
 SCHEMA = """
@@ -40,7 +42,7 @@ CREATE TABLE IF NOT EXISTS harness_runs (
 );
 CREATE INDEX IF NOT EXISTS harness_proactive
     ON harness_runs(user_id,trigger,created_at);
-"""
+""" + MEMORY_SCHEMA
 
 
 def _settings(db, user):
@@ -74,10 +76,16 @@ def put_settings(store, user, payload):
         previous, since = _settings(db, user)
         if previous == payload:
             return previous
+        now = storage.now_utc()
         if not payload.use_feedback_memory:
             since = None
         elif not previous.use_feedback_memory:
-            since = storage.stamp(storage.now_utc())
+            since = storage.stamp(now)
+        if (payload.use_feedback_memory != previous.use_feedback_memory
+                or payload.use_behavior_memory != previous.use_behavior_memory):
+            advance_epoch(db, user, now,
+                          feedback=payload.use_feedback_memory != previous.use_feedback_memory,
+                          behavior=payload.use_behavior_memory != previous.use_behavior_memory)
         db.execute(
             """INSERT INTO harness_settings VALUES (?,?,?)
                ON CONFLICT(user_id) DO UPDATE SET
@@ -88,35 +96,29 @@ def put_settings(store, user, payload):
     return payload
 
 
-def _memory(db, user, settings, since, now):
-    if not settings.use_feedback_memory or since is None:
-        return []
-    boundary = max(since, storage.stamp(now - timedelta(days=30)))
-    rows = db.execute(
-        """SELECT f.activity_id,f.payload_json FROM activity_feedback f
-           JOIN activity_sessions s ON s.user_id=f.user_id AND s.session_id=f.session_id
-           WHERE f.user_id=? AND f.completed=1 AND s.status='COMPLETED'
-           AND f.created_at>=? AND f.created_at<=?
-           ORDER BY f.created_at DESC,f.event_id DESC LIMIT 100""",
-        (user, boundary, storage.stamp(now)),
-    )
-    scores = {}
-    for row in rows:
-        rating = json.loads(row["payload_json"]).get("enjoyment")
-        if type(rating) is int and 1 <= rating <= 5 and get_activity(row["activity_id"]):
-            scores.setdefault(row["activity_id"], []).append(rating - 3)
-    return [
-        MemoryEntry(activity_id=aid, count=len(values),
-                    score=round(sum(values) / (len(values) + 2), 4))
-        for aid, values in sorted(scores.items())
-    ]
-
-
-def get_memory(store, user):
-    with closing(store.connect()) as db:
+def get_memory(store, user, available_minutes=None):
+    with store.transaction() as db:
         settings, since = _settings(db, user)
-        return MemoryView(enabled=settings.use_feedback_memory,
-                          entries=_memory(db, user, settings, since, storage.now_utc()))
+        candidates = None if available_minutes is None else tuple(
+            entry for entry in catalog_entries() if entry[2] <= available_minutes
+        )
+        return recall(db, user, settings, since, storage.now_utc(), candidates)
+
+
+def reset_memory(store, user):
+    """Exclude all existing evidence; preserve business records and invalidate pending plans."""
+    with store.transaction() as db:
+        settings, _ = _settings(db, user)
+        now = storage.now_utc()
+        advance_epoch(db, user, now, feedback=True, behavior=True)
+        since = storage.stamp(now) if settings.use_feedback_memory else None
+        db.execute(
+            """INSERT INTO harness_settings VALUES (?,?,?)
+               ON CONFLICT(user_id) DO UPDATE SET memory_since=excluded.memory_since""",
+            (user, settings.model_dump_json(), since),
+        )
+        invalidate_pending(db, user)
+        return recall(db, user, settings, since, now)
 
 
 def _energy(db, user, settings, payload, now):
@@ -230,7 +232,6 @@ def _snapshot(db, user, payload, now):
     if not reason:
         energy, source = _energy(db, user, settings, payload, now)
         trace.append(_trace("perception", source))
-        memory = _memory(db, user, settings, since, now)
         trace.append(_trace("memory", "enabled" if settings.use_feedback_memory else "disabled"))
         excluded = set(settings.blocked_activity_ids) | set(payload.skip_activity_ids)
         entries = tuple(e for e in catalog_entries()
@@ -239,10 +240,12 @@ def _snapshot(db, user, payload, now):
         if not entries:
             reason = "no_eligible_activity"
         else:
+            memory = recall(db, user, settings, since, now, entries)
+            trace.append(_trace("retrieval", f"feedback:{memory.recalled_events};behavior:{memory.behavior_events}"))
             context = DecisionContext(
                 available_minutes=payload.available_minutes, energy_level=energy,
                 preference_tags=frozenset(settings.preference_tags),
-                memory_scores=tuple((m.activity_id, m.score) for m in memory),
+                memory_scores=tuple((m.activity_id, m.decision_score) for m in memory.entries),
             )
     return (settings, since, revision["revision"] if revision else 0,
             reason, trace, entries, context)

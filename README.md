@@ -48,3 +48,5 @@ uvicorn shiyi_api.main:app --reload --port 8000
 智能体运行框架：[HARNESS.md](docs/HARNESS.md)（本地规则基线与用户确认；无外部模型或自主推送）。
 
 可选本机模型排序：[MODEL_ADAPTER.md](docs/MODEL_ADAPTER.md)（默认关闭，规则回退，不接收真实健康数据）。
+
+记忆检索与隐私控制：[MEMORY_HARNESS.md](docs/MEMORY_HARNESS.md)（V0.7 合成数据）。

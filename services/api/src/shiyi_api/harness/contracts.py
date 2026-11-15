@@ -19,6 +19,8 @@ class Settings(BaseModel):
 
     use_observations: bool = False
     use_feedback_memory: bool = False
+    use_behavior_memory: bool = False
+    memory_budget: StrictInt = Field(default=12, ge=1, le=20)
     use_local_model: bool = False
     preference_tags: list[Tag] = Field(default_factory=list, max_length=5)
     blocked_activity_ids: list[str] = Field(default_factory=list, max_length=50)
@@ -90,9 +92,17 @@ class MemoryEntry(BaseModel):
     activity_id: str
     count: int
     score: float
+    effective_weight: float = 0.0
+    recent_completions: int = 0
+    repetition_penalty: float = 0.0
+    decision_score: float = 0.0
 
 
 class MemoryView(BaseModel):
     enabled: bool
+    behavior_enabled: bool = False
+    budget: int = 12
+    recalled_events: int = 0
+    behavior_events: int = 0
     entries: list[MemoryEntry]
     is_demo: Literal[True] = True

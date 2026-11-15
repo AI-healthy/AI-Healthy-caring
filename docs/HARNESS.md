@@ -1,4 +1,4 @@
-# ShiYi Agent Harness V0.6 · 本地模型适配与受约束决策
+# ShiYi Agent Harness V0.7 · 授权记忆检索与受约束决策
 
 这是有界、结构化智能体运行框架，允许可选本机模型参与候选排序，不是通用聊天系统。所有输入为合成测试数据。
 模块：harness/contracts.py、engine.py、repository.py、api.py。xu 维护运行时与工具边界，
@@ -8,16 +8,16 @@ fu 可在可信本地代码中实现 Ranker.rank(context, candidates)；默认�
 ## 决策循环
 
 触发与设置 → 安全门（用户主动声明忙/不适、主动陪伴开关、勿扰和冷却） →
-最小授权感知 → 反馈记忆 → 候选目录过滤 → 策略排序 → 验证输出 →
+最小授权感知 → 候选目录过滤 → 预算约束记忆检索 → 策略排序 → 验证输出 →
 等待用户确认 → 原子创建 CREATED 活动会话 → 现有 Activity API 执行及反馈。
 
 - 仅当前请求明确的精力自评，或开启 use_observations 后本人已授权、6 小时内最新的
   self_report/energy_level 合成记录。缺失即未知，不回填、不把心率解释为心理状态；
   睡眠/步数暂不进入排序，避免没有依据的健康阈值。
 - 偏好标签与手动屏蔽活动由用户设置；反馈记忆默认关闭。
-  只聚合开启之后、近30天最近100条已完成活动的有效 enjoyment 评分，按活动计算
-  score = sum(rating-3)/(count+2)。关闭/重新开启会重置记忆使用窗口，不删除业务反馈。
-  评分仅用于排序，不做心理画像或医疗判断。
+  V0.7 按活动候选检索近30天有效体验评分并按7天半衰期加权，反馈预算1–20条。
+  行为记忆单独开启，仅使用近48小时真实用户确认完成的合成活动会话进行多样性调整。
+  关闭/重新开启或重置会排除此前证据；不删除业务反馈或活动记录。详见 MEMORY_HARNESS.md。
 - Ranker 只能返回候选 ID（最多3个）；未知/重复/空/异常输出回退本地规则。
   标题、时长、解释均来自服务端，不执行任意工具。当前策略必须快速、无副作用、仅本地运行；
   服务端策略依赖 harness.api.get_ranker 可在本地启动配置/测试中替换，前端不能提交执行代码。
@@ -40,7 +40,8 @@ fu 可在可信本地代码中实现 Ranker.rank(context, candidates)；默认�
 | Method | /api/v1/harness | 说明 |
 | --- | --- | --- |
 | GET / PUT | /settings | 查询/完整替换设置 |
-| GET | /memory | 查看开启状态及聚合分数 |
+| GET | /memory | 查看聚合分数，可选 available_minutes | 
+| POST | /memory/reset | 重置记忆使用窗口、使待确认计划失效 |
 | POST | /runs | 生成有界方案，client_request_id 幂等 |
 | GET | /runs/{run_id} | 查询状态及可解释 trace |
 | POST | /runs/{run_id}/confirm | {"activity_id":"stretch"} |
@@ -71,3 +72,5 @@ bash scripts/demo_backend.sh 从真实本地 HTTP 走完整登录、Harness 规�
 独立用户授权的设备端工具、主动提醒 worker/投递幂等、保留删除策略及对照实验。
 
 本机 LLM、工具路由、预算与威胁边界详见 [MODEL_ADAPTER.md](MODEL_ADAPTER.md)。
+
+V0.7 记忆设计与验收：[MEMORY_HARNESS.md](MEMORY_HARNESS.md)。

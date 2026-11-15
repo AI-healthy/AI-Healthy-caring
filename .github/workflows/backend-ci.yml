@@ -22,3 +22,10 @@ jobs:
         run: python -m ruff check src tests
       - name: HTTP simulator smoke test
         run: bash ../../scripts/demo_backend.sh
+      - name: Synthetic harness benchmark
+        run: python -m shiyi_api.benchmark --seed 42 --per-cohort 12 --assert-gates --output ../../benchmark-results
+      - name: Upload synthetic benchmark
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiyi-synthetic-benchmark
+          path: benchmark-results/

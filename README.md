@@ -52,3 +52,5 @@ uvicorn shiyi_api.main:app --reload --port 8000
 记忆检索与隐私控制：[MEMORY_HARNESS.md](docs/MEMORY_HARNESS.md)（V0.7 合成数据）。
 
 主动陪伴调度与模拟邀请：[PROACTIVE_HARNESS.md](docs/PROACTIVE_HARNESS.md)（需要独立启动本地 worker；不实际推送）。
+
+Harness 合成评估：[HARNESS_BENCHMARK.md](docs/HARNESS_BENCHMARK.md)（V0.9，不代表真人健康效果）。

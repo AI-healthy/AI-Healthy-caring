@@ -23,7 +23,10 @@ jobs:
       - name: HTTP simulator smoke test
         run: bash ../../scripts/demo_backend.sh
       - name: Synthetic harness benchmark
-        run: python -m shiyi_api.benchmark --seed 42 --per-cohort 12 --assert-gates --output ../../benchmark-results
+        run: |
+          for seed in 42 43 44; do
+            python -m shiyi_api.benchmark --seed "$seed" --per-cohort 12 --assert-gates --output "../../benchmark-results/seed-$seed"
+          done
       - name: Upload synthetic benchmark
         uses: actions/upload-artifact@v4
         with:

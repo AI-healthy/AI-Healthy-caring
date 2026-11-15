@@ -196,6 +196,33 @@ def summarize(rows):
     return result
 
 
+def paired_deltas(rows):
+    """Paired outcome comparisons, preserving ties and unfavorable results."""
+    comparisons = (
+        ("static_memory", "no_memory"),
+        ("decay_memory", "static_memory"),
+        ("decay_and_behavior", "decay_memory"),
+        ("decay_and_behavior", "no_memory"),
+    )
+    indexed = {(row["case_id"], row["method"]): row for row in rows}
+    out = {}
+    for cohort in ("all", *COHORTS):
+        out[cohort] = {}
+        for method, baseline in comparisons:
+            group = [
+                row["top1_utility"] - indexed[(row["case_id"], baseline)]["top1_utility"]
+                for row in rows if row["method"] == method
+                and (cohort == "all" or row["cohort"] == cohort)
+            ]
+            out[cohort][f"{method}_vs_{baseline}"] = {
+                "n": len(group), "wins": sum(delta > 0 for delta in group),
+                "ties": sum(delta == 0 for delta in group),
+                "losses": sum(delta < 0 for delta in group),
+                "mean_utility_delta": round(statistics.fmean(group), 4),
+            }
+    return out
+
+
 # Independent fixture labels are scenario assumptions, not outputs from the gate.
 GATE_CASES = (
     ("available", True), ("disabled", False), ("no_lease", False),
@@ -211,14 +238,14 @@ def evaluate_proactive(store):
     for name, expected in GATE_CASES:
         user = "gate:" + name
         now = NOW
-        settings = Settings(proactive_enabled=name != "disabled", timezone="UTC",
+        settings = Settings(proactive_enabled=True, timezone="UTC",
                             quiet_start="11:00" if name in {"quiet", "quiet_boundary"} else
                             "22:00",
                             quiet_end="12:00" if name == "quiet_boundary" else
                             "13:00" if name == "quiet" else "01:00")
         with patch.object(storage, "now_utc", return_value=NOW):
             repository.put_settings(store, user, settings)
-            if name not in {"disabled", "no_lease"}:
+            if name != "no_lease":
                 if name in {"cooldown", "daily_limit", "after_cooldown"}:
                     offsets = [1] if name == "cooldown" else [9, 5] if name == "daily_limit" else [5]
                     for offset in offsets:
@@ -240,6 +267,10 @@ def evaluate_proactive(store):
                 ))
                 if name == "paused":
                     proactive.put_schedule(store, user, ScheduleRequest(enabled=False))
+                if name == "disabled":
+                    repository.put_settings(store, user, settings.model_copy(
+                        update={"proactive_enabled": False}
+                    ))
                 if name == "expired":
                     now = NOW + timedelta(minutes=16)
         with patch.object(storage, "now_utc", return_value=now):
@@ -274,7 +305,8 @@ def evaluate(seed=42, per_cohort=12):
         gates = evaluate_proactive(store)
     return {"benchmark": VERSION, "is_synthetic": True, "seed": seed,
             "cases_per_cohort": per_cohort, "scenario_count": len(cases),
-            "rankings": len(rows), "memory": summarize(rows), "gates": {
+            "rankings": len(rows), "memory": summarize(rows), "paired": paired_deltas(rows),
+            "gates": {
                 key: gate_metrics(gates, key) for key in ("harness", "ungated_counterfactual")
             }, "ranking_rows": rows, "gate_rows": gates}
 

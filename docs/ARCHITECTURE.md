@@ -35,7 +35,7 @@ flowchart LR
 | 知识库 | 证据可追溯的四类内容、地域与节气分类 | 将民俗宣称为有效治疗 |
 | Jev | 非医疗意图路由、活动排序与提醒选择 | 药物禁忌安全终裁 |
 
-## 3. 核心数据模型（后续实现）
+## 3. 核心数据模型（逐步实现）
 
 `User`、`Device`、`Consent`、`HealthObservation`、`CheckIn`、`ActivityCatalog`、`Recommendation`、`ActivitySession`、`ExperienceFeedback`、`KnowledgeCard`、`SeasonTheme`。
 
@@ -71,6 +71,8 @@ sequenceDiagram
 ## 5. 后端模块与 MVP API
 
 当前实现：`GET /api/v1/health`、`GET /api/v1/seasons/current`（固定演示卡）、`POST /api/v1/recommendations`（规则演示）、`POST /api/v1/activities/feedback`（SQLite 持久化、开发身份隔离）。
+
+本地账号、可撤销登录令牌、来源/指标授权、合成健康观测已新增；见 [USER_HEALTH_API.md](USER_HEALTH_API.md)。真实数据接入须隐私与部署审查，未自动输入 AI。
 
 未来按领域划分：`identity`、`consent`、`state`、`seasons`、`knowledge`、`recommendations`、`activities`、`devices`。
 

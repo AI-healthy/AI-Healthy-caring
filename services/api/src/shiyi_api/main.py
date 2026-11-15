@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from .activity_api import router as activity_router
 from .device_api import router as device_router
+from .health_api import router as health_router
+from .identity_api import router as identity_router
 from .recommendation import get_recommendations
 from .schemas import (
     RecommendationRequest,
@@ -14,12 +18,23 @@ from .schemas import (
 
 app = FastAPI(
     title="ShiYi API (local activity MVP)",
-    description="Local demo only. Activity records use SQLite and development bearer identities.",
-    version="0.3.0",
+    description="Local demo only. Accounts, activities and synthetic observations use SQLite.",
+    version="0.4.0",
 )
 
 app.include_router(activity_router)
 app.include_router(device_router)
+app.include_router(identity_router)
+app.include_router(health_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_request: Request, exc: RequestValidationError):
+    # Never reflect raw password, credential or observation values in errors.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": list(error["loc"]), "type": error["type"], "msg": "Invalid input"}
+        for error in exc.errors()
+    ]})
 
 
 @app.get("/api/v1/health")

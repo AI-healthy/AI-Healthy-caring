@@ -4,7 +4,7 @@
 >
 > 第二十届全国大学生软件创新大赛 · AI + 健康赛道
 
-**状态：本地后端 MVP，非可交付产品。** 活动与反馈 SQLite 持久化、设备模拟 REST、MCP 只读工具；Android、Stack-chan 原生固件与真实穿戴数据尚未经代码联调。
+**状态：本地后端 MVP，非可交付产品。** 本地账号与合成健康数据授权、活动与反馈 SQLite 持久化、设备模拟 REST、MCP 只读工具；Android、Stack-chan 原生固件与真实穿戴数据尚未经代码联调。
 
 ## 组成
 
@@ -42,3 +42,5 @@ uvicorn shiyi_api.main:app --reload --port 8000
 运行 `bash scripts/demo_backend.sh`（仓库根目录，Python 3.11+）验证本地模拟闭环。
 活动 API：[ACTIVITY_API.md](docs/ACTIVITY_API.md)；
 设备模拟与小智 MCP：[INTEGRATION.md](docs/INTEGRATION.md)。
+
+用户与健康数据接口：[USER_HEALTH_API.md](docs/USER_HEALTH_API.md)（仅合成数据）。

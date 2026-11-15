@@ -36,3 +36,7 @@ REST: POST /api/v1/devices/commands; GET /api/v1/devices/commands/{command_id}
 ACK 与完成/失败事件按事件 ID 去重。活动完成由用户确认，不能由机器人表达回执代替。
 所有消息 is_demo=true。这不是 M5Stack 原生协议，也不是生产设备绑定。
 详见 [XU-02 联调指南](../../docs/INTEGRATION.md) 和 OpenAPI。
+
+## 用户与健康记录（V0.4）
+账号注册/登录/退出/个人资料：/api/v1/users；按 source+metric 授权及合成观测：/api/v1/health/consents、/api/v1/health/observations。
+见 [用户与健康数据 API](../../docs/USER_HEALTH_API.md)；真实穿戴权限与 SDK 尚未验证。

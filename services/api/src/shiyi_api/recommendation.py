@@ -40,3 +40,8 @@ def get_recommendations(request: RecommendationRequest) -> list[ActivityOption]:
 def get_activity(activity_id: str):
     """Resolve an existing low-risk catalog entry; never trust client durations."""
     return next((entry for entry in _CATALOG if entry[0] == activity_id), None)
+
+
+def catalog_entries() -> tuple:
+    """Immutable snapshot for allowlisted harness candidate generation."""
+    return tuple(_CATALOG)

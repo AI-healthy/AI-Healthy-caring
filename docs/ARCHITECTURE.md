@@ -116,3 +116,6 @@ sequenceDiagram
 - Android、后端、嵌入式、设计的负责人。
 
 参考：https://docs.m5stack.com/en/StackChan · https://developer.android.com/health-and-fitness/health-connect
+
+## Agent Harness V0.5
+本地有界决策框架实现用户触发、授权自评、反馈偏好记忆、候选过滤、可插拔 Ranker、确认后创建活动与 trace；主动陪伴仅判断是否生成建议。详见 [HARNESS.md](HARNESS.md)，未接入外部 LLM/RAG、后台推送或真实机器人。

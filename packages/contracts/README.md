@@ -40,3 +40,6 @@ ACK 与完成/失败事件按事件 ID 去重。活动完成由用户确认，�
 ## 用户与健康记录（V0.4）
 账号注册/登录/退出/个人资料：/api/v1/users；按 source+metric 授权及合成观测：/api/v1/health/consents、/api/v1/health/observations。
 见 [用户与健康数据 API](../../docs/USER_HEALTH_API.md)；真实穿戴权限与 SDK 尚未验证。
+
+## Agent Harness（V0.5）
+/api/v1/harness/settings、memory、runs、runs/{run_id}/confirm、runs/{run_id}/dismiss。用户确认只创建活动，不启动设备；详见 [HARNESS.md](../../docs/HARNESS.md)。

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from .activity_api import router as activity_router
 from .device_api import router as device_router
+from .harness.api import router as harness_router
 from .health_api import router as health_router
 from .identity_api import router as identity_router
 from .recommendation import get_recommendations
@@ -19,13 +20,14 @@ from .schemas import (
 app = FastAPI(
     title="ShiYi API (local activity MVP)",
     description="Local demo only. Accounts, activities and synthetic observations use SQLite.",
-    version="0.4.0",
+    version="0.5.0",
 )
 
 app.include_router(activity_router)
 app.include_router(device_router)
 app.include_router(identity_router)
 app.include_router(health_router)
+app.include_router(harness_router)
 
 
 @app.exception_handler(RequestValidationError)

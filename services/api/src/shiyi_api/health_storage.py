@@ -68,6 +68,10 @@ def update_consent(store, user, source, metric, payload):
                updated_at=excluded.updated_at""",
             (user, source, metric, int(payload.granted), payload.policy_version, now),
         )
+        if not payload.granted:
+            from .harness.repository import invalidate_pending
+
+            invalidate_pending(db, user)
         db.execute("INSERT INTO health_consent_events VALUES (?,?,?,?,?,?,?)",
                    (str(uuid4()), user, source, metric, int(payload.granted),
                     payload.policy_version, now))
@@ -144,3 +148,6 @@ def delete_observation(store, user, observation_id):
         )
         if deleted.rowcount != 1:
             raise StoreError(404, "Observation not found")
+        from .harness.repository import invalidate_pending
+
+        invalidate_pending(db, user)

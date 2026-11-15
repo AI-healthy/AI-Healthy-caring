@@ -66,9 +66,10 @@ class SessionStore:
             # Local import prevents the storage/device module import cycle.
             from .device_storage import SCHEMA as device_schema
             from .health_storage import SCHEMA as health_schema
+            from .harness.repository import SCHEMA as harness_schema
             from .identity_storage import SCHEMA as identity_schema
 
-            db.executescript(device_schema + identity_schema + health_schema)
+            db.executescript(device_schema + identity_schema + health_schema + harness_schema)
 
     def connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=5)
@@ -99,29 +100,33 @@ class SessionStore:
         return self._get(db, user, session_id)
 
     def create(self, user, activity_id, title, minutes, client_request_id):
-        now = now_utc()
         with self.transaction() as db:
-            existing = None
-            if client_request_id is not None:
-                existing = db.execute(
-                    """SELECT * FROM activity_sessions
-                       WHERE user_id=? AND client_request_id=?""",
-                    (user, client_request_id),
-                ).fetchone()
-            if existing is not None:
-                if existing["activity_id"] != activity_id:
-                    raise StoreError(409, "client_request_id already used for another activity")
-                return dict(self._expire(db, user, existing["session_id"], now))
-            session_id = str(uuid4())
-            db.execute(
-                """INSERT INTO activity_sessions
-                   (session_id,user_id,client_request_id,activity_id,title,
-                    duration_minutes,status,created_at,expires_at)
-                   VALUES (?,?,?,?,?,?,'CREATED',?,?)""",
-                (session_id, user, client_request_id, activity_id, title, minutes,
-                 stamp(now), stamp(now + timedelta(minutes=30))),
+            return self.create_in_transaction(
+                db, user, activity_id, title, minutes, client_request_id, now_utc()
             )
-            return dict(self._get(db, user, session_id))
+
+    def create_in_transaction(self, db, user, activity_id, title, minutes, client_request_id, now):
+        existing = None
+        if client_request_id is not None:
+            existing = db.execute(
+                """SELECT * FROM activity_sessions
+                   WHERE user_id=? AND client_request_id=?""",
+                (user, client_request_id),
+            ).fetchone()
+        if existing is not None:
+            if existing["activity_id"] != activity_id:
+                raise StoreError(409, "client_request_id already used for another activity")
+            return dict(self._expire(db, user, existing["session_id"], now))
+        session_id = str(uuid4())
+        db.execute(
+            """INSERT INTO activity_sessions
+               (session_id,user_id,client_request_id,activity_id,title,
+                duration_minutes,status,created_at,expires_at)
+               VALUES (?,?,?,?,?,?,'CREATED',?,?)""",
+            (session_id, user, client_request_id, activity_id, title, minutes,
+             stamp(now), stamp(now + timedelta(minutes=30))),
+        )
+        return dict(self._get(db, user, session_id))
 
     def get(self, user, session_id):
         with self.transaction() as db:

@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import httpx
 
-from .device_contract import DeviceCommand, DeviceEvent
+from .device_contract import CommandView, DeviceEvent
 
 
 def run_once(client, device_id: str, token: str, fail: bool = False):
@@ -15,18 +15,20 @@ def run_once(client, device_id: str, token: str, fail: bool = False):
     response.raise_for_status()
     if response.json() is None:
         return None
-    command = DeviceCommand.model_validate(response.json())
+    command = CommandView.model_validate(response.json())
     if command.device_id != device_id or command.expires_at <= datetime.now(UTC):
         raise ValueError("Wrong device or expired simulator command")
-    # Deterministic event ID AND timestamp make retries identical across simulator restarts.
-    # We use a fixed timestamp from the command for synthetic events only.
-    for event_type in (
-        "COMMAND_ACKNOWLEDGED", "COMMAND_FAILED" if fail else "COMMAND_COMPLETED"
-    ):
+    # On restart the server returns ACKNOWLEDGED until a terminal receipt is saved.
+    # Re-poll instead of fabricating a timestamp or re-executing a physical action.
+    event_types = []
+    if command.status == "QUEUED":
+        event_types.append("COMMAND_ACKNOWLEDGED")
+    event_types.append("COMMAND_FAILED" if fail else "COMMAND_COMPLETED")
+    for event_type in event_types:
         event = DeviceEvent(
             schema_version=command.schema_version, device_id=device_id,
             command_id=command.command_id, event_id=f"{command.command_id}:{event_type}",
-            type=event_type, occurred_at=command.expires_at, is_demo=True,
+            type=event_type, occurred_at=datetime.now(UTC), is_demo=True,
         )
         response = client.post(path + "/events", headers=headers, json=event.model_dump(mode="json"))
         response.raise_for_status()

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 from .auth import bearer, current_user
-from .device_contract import CommandRequest, CommandView, DeviceCommand, DeviceEvent, Receipt
+from .device_contract import CommandRequest, CommandView, DeviceEvent, Receipt
 from .device_storage import enqueue, get_command, pending, record_event
 from .storage import SessionStore, StoreError, get_store
 
@@ -82,7 +82,7 @@ def command_status(command_id: str, user: User, store: Store):
     return result
 
 
-@router.get("/{device_id}/pending", response_model=DeviceCommand | None)
+@router.get("/{device_id}/pending", response_model=CommandView | None)
 def poll(device_id: str, owner: DeviceOwner, store: Store):
     return invoke(pending, store, owner, device_id)
 

@@ -23,7 +23,7 @@ MCP 工具不创建任务、不读取个人记录，不含用户或设备令牌�
   → POST /api/v1/devices/{device_id}/events（独立设备 Bearer token）
 - QUEUED → ACKNOWLEDGED → COMPLETED / FAILED。
   活动结束或命令过期时，未终结命令在访问时标记 CANCELLED / EXPIRED。
-- 命令重复投递可能发生；同一事件 ID 必须重发完全相同的消息。当前仅无副作用的模拟表情，
+- 命令重复投递可能发生；同一事件 ID 必须重发完全相同的消息；模拟器重启后先查询状态，已 ACK 则直接发送模拟终态。当前仅无副作用的模拟表情，
   真机应持久化已执行 command_id，设计物理命令幂等和执行取消。REST 不等于 WebSocket；
   后续适配器可更换传输层，但不应把命令完成理解为用户活动完成。
 - 设备白名单来自 SHIYI_DEV_DEVICES，身份必须绑定已存在的开发用户。

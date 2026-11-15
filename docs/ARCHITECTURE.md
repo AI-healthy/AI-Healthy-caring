@@ -70,7 +70,7 @@ sequenceDiagram
 
 ## 5. 后端模块与 MVP API
 
-当前实现：`GET /api/v1/health`、`GET /api/v1/seasons/current`（固定演示卡）、`POST /api/v1/recommendations`（规则演示）、`POST /api/v1/activities/feedback`（内存幂等演示）。
+当前实现：`GET /api/v1/health`、`GET /api/v1/seasons/current`（固定演示卡）、`POST /api/v1/recommendations`（规则演示）、`POST /api/v1/activities/feedback`（SQLite 持久化、开发身份隔离）。
 
 未来按领域划分：`identity`、`consent`、`state`、`seasons`、`knowledge`、`recommendations`、`activities`、`devices`。
 
@@ -82,7 +82,7 @@ sequenceDiagram
 
 每条命令包含 `schema_version`、`command_id`、`correlation_id`、`device_id`、`type`、`payload`、`expires_at`；回执包含事件 ID、发生时间及对应命令。执行必须幂等、参数白名单、动作边界、鉴权和超时；正式联网要求 TLS。
 
-硬件协议、固件烧录、摄像头与穿戴数据均**尚未在实机验证**。
+本地设备命令与回执通过 REST 模拟，当前仅允许 SET_EXPRESSION；设备身份为独立开发令牌。MCP 只读工具通过 stdio 接入桥接器。详细边界见 [INTEGRATION.md](INTEGRATION.md)。硬件协议、真机 AI 工具调用、摄像头与穿戴数据均**尚未在代码联调中验证**。
 
 ## 7. AI 推荐与安全
 

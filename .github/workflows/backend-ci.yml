@@ -20,3 +20,5 @@ jobs:
         run: python -m pytest -q
       - name: Ruff
         run: python -m ruff check src tests
+      - name: HTTP simulator smoke test
+        run: bash ../../scripts/demo_backend.sh

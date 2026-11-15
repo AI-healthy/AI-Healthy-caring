@@ -117,3 +117,16 @@ def test_event_order_replay_and_conflict(client):
                        json={**event,"device_id":"other"}).status_code == 409
     assert client.post(path, headers=DEVICE,
                        json={**event,"is_demo":False}).status_code == 422
+
+
+def test_simulator_resumes_after_ack(client):
+    sid, _ = new_session(client)
+    command = enqueue(client, sid)
+    ack = {
+        "schema_version": "0.1-draft", "event_id": "previous-ack", "device_id": "sim",
+        "type": "COMMAND_ACKNOWLEDGED", "command_id": command["command_id"],
+        "occurred_at": storage.now_utc().isoformat(), "is_demo": True,
+    }
+    assert client.post(ROOT + "/sim/events", headers=DEVICE, json=ack).status_code == 200
+    assert client.get(ROOT + "/sim/pending", headers=DEVICE).json()["status"] == "ACKNOWLEDGED"
+    assert run_once(client, "sim", TOKEN)["command"]["status"] == "COMPLETED"

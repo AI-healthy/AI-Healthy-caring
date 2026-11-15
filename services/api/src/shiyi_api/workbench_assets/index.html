@@ -21,7 +21,7 @@ pre{background:#f3f7f4;border-radius:8px;padding:12px;white-space:pre-wrap;overf
 <body><main>
 <header><span class="tag">LOCAL DEMO · 合成数据</span><h1>时宜 / Agent Harness Workbench</h1>
 <p class="muted">开发联调工具 · 使用真实本地 API；机器人为模拟器。不是 Android 产品页面，也不会向真实设备发送动作。</p>
-<div class="controls"><button id="init">创建临时测试账号</button><button id="logout" class="secondary" data-login disabled>退出</button><span id="account">未登录</span><a href="/docs">OpenAPI 文档</a></div><div id="notice" role="status" aria-live="polite"></div></header>
+<div class="controls"><button id="init">创建临时测试账号</button><button id="logout" class="secondary" data-login disabled>退出</button><button id="refresh" class="secondary" data-login disabled>刷新服务端状态</button><span id="account">未登录</span><a href="/docs">OpenAPI 文档</a></div><div id="notice" role="status" aria-live="polite"></div></header>
 <div class="grid">
 <section class="panel"><h2>01 · Context & Memory</h2><p class="muted">合成状态与记忆开关。关闭后停止相应记忆使用。</p>
 <div class="controls"><label>偏好<select id="preference"><option value="">无</option><option value="culture">四时文化</option><option value="gentle">轻柔</option><option value="movement">运动</option><option value="music">音乐</option><option value="outdoor">户外</option></select></label><label><input id="feedbackMemory" type="checkbox" data-login disabled>体验记忆</label><label><input id="behaviorMemory" type="checkbox" data-login disabled>行为记忆</label></div>

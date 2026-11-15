@@ -94,6 +94,11 @@
       use_feedback_memory:$("feedbackMemory").checked,use_behavior_memory:$("behaviorMemory").checked});
     await refreshRun(); await refreshMemory();
   });
+  on("refresh",async()=>{
+    await refreshRun();
+    if (session) showSession(await api("/activities/sessions/"+session.session_id));
+    await refreshMemory(); put("offerOut",await api("/proactive/schedule"));
+  });
   on("memory",refreshMemory);
   on("reset",async()=>{put("memoryOut",await api("/harness/memory/reset","POST"));await refreshRun();});
   on("plan",async()=>{
@@ -107,17 +112,22 @@
     on(id,async()=>showSession(await api("/activities/sessions/"+session.session_id+"/"+verb,"POST")));
   }
   on("robot",async()=>{
-    const command=await api("/devices/commands","POST",{session_id:session.session_id,
-      device_id:deviceId,preset:"happy",client_request_id:key()});
     const path="/devices/"+deviceId;
-    const pending=await api(path+"/pending","GET",null,"device");
-    if (!pending || pending.command_id!==command.command_id) throw new Error("模拟队列当前没有对应命令");
-    for (const type of ["COMMAND_ACKNOWLEDGED","COMMAND_COMPLETED"]) {
+    let pending=await api(path+"/pending","GET",null,"device");
+    if (!pending) {
+      const command=await api("/devices/commands","POST",{session_id:session.session_id,
+        device_id:deviceId,preset:"happy",client_request_id:key()});
+      pending=await api(path+"/pending","GET",null,"device");
+      if (!pending || pending.command_id!==command.command_id) throw new Error("模拟队列当前没有对应命令");
+    }
+    if (pending.correlation_id!==session.session_id) throw new Error("模拟端存在其他会话的命令");
+    const eventTypes=pending.status==="QUEUED"?["COMMAND_ACKNOWLEDGED","COMMAND_COMPLETED"]:["COMMAND_COMPLETED"];
+    for (const type of eventTypes) {
       await api(path+"/events","POST",{schema_version:pending.schema_version,event_id:key(),
         device_id:deviceId,type,command_id:pending.command_id,occurred_at:new Date().toISOString(),
         is_demo:true},"device");
     }
-    put("deviceOut",await api("/devices/commands/"+command.command_id));
+    put("deviceOut",await api("/devices/commands/"+pending.command_id));
   });
   on("feedback",async()=>{
     await api("/activities/feedback","POST",{session_id:session.session_id,activity_id:session.activity_id,

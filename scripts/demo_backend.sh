@@ -63,6 +63,7 @@ PY
 
 python - <<'PY'
 import asyncio
+import json
 import sys
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -86,7 +87,11 @@ async def verify():
                 ):
                     result = await session.call_tool(name, arguments=args)
                     assert not result.isError, result
-                    data = result.structuredContent or {}
+                    data = result.structuredContent
+                    if data is None:
+                        texts = [block.text for block in result.content if block.type == "text"]
+                        assert len(texts) == 1, result
+                        data = json.loads(texts[0])
                     data = data.get("result", data)
                     assert data.get("ok") is True and data.get("is_demo") is True, data
                     if name == "get_shiyi_season_card":

@@ -19,7 +19,7 @@
 - POST /api/v1/activities/sessions/{session_id}/cancel
 - POST /api/v1/activities/feedback
 
-上述接口均要求 Authorization: Bearer <dev-token>，身份由服务端配置决定。
+上述接口均要求 Authorization: Bearer <access-token>，支持注册账号登录令牌与预配置开发身份。
 推荐、节气及健康检查保持原有演示契约。新活动反馈建议包含 session_id；
 旧客户端可暂时省略，但不属于活动状态闭环。前端不要将开发令牌写入源码或安装包。
 

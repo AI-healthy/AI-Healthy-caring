@@ -102,3 +102,58 @@ async def verify():
 
 asyncio.run(verify())
 PY
+
+python - <<'PY'
+import secrets
+from datetime import UTC, datetime, timedelta
+import httpx
+from shiyi_api.simulator import run_once
+
+with httpx.Client(base_url="http://127.0.0.1:8000", timeout=10) as c:
+    def request(method, path, data=None, auth=None, status=200):
+        res = c.request(method, path, json=data, headers=auth)
+        assert res.status_code == status, f"{method} {path}: {res.status_code}"
+        return res.json() if status != 204 else None
+
+    users = "/api/v1/users"
+    health = "/api/v1/health"
+    credentials = {"username":"synthetic_user","password":secrets.token_urlsafe(24)}
+    request("POST", users + "/register", credentials, status=201)
+    login = request("POST", users + "/login", credentials)
+    auth = {"Authorization":"Bearer " + login["access_token"]}
+    now = datetime.now(UTC)
+    sample = {"client_sample_id":"demo-steps","source":"health_connect","metric":"steps",
+              "value":1200,"interval_start":(now-timedelta(hours=1)).isoformat(),
+              "observed_at":now.isoformat(),"is_demo":True}
+    payload = {"observations":[sample]}
+    request("POST", health + "/observations", payload, auth, 403)
+    consent = {"granted":True,"policy_version":"local-demo-v1"}
+    cp = health + "/consents/health_connect/steps"
+    request("PUT", cp, consent, auth)
+    receipt = request("POST", health + "/observations", payload, auth)
+    assert not receipt["items"][0]["duplicate"]
+    assert request("POST", health + "/observations", payload, auth)["items"][0]["duplicate"]
+    page = request("GET", health + "/observations", auth=auth)
+    assert page["items"][0]["is_demo"] and page["items"][0]["value"] == 1200
+    request("PUT", cp, {**consent,"granted":False}, auth)
+    request("POST", health + "/observations", payload, auth, 403)
+    bind = request("POST", users + "/me/simulated-devices", {"name":"Demo robot"}, auth, 201)
+    did = bind["device"]["device_id"]
+    activity = request("POST", "/api/v1/activities/sessions", {"activity_id":"stretch"}, auth)
+    sid = activity["session_id"]
+    path = "/api/v1/activities/sessions/" + sid
+    request("POST", path + "/start", auth=auth)
+    request("POST", "/api/v1/devices/commands",
+            {"session_id":sid,"device_id":did,"client_request_id":"registered-demo"}, auth)
+    assert run_once(c, did, bind["device_token"])["command"]["status"] == "COMPLETED"
+    request("POST", path + "/complete", auth=auth)
+    request("POST", "/api/v1/activities/feedback",
+            {"session_id":sid,"activity_id":"stretch","completed":True,
+             "client_event_id":"registered-feedback"}, auth)
+    request("DELETE", users + "/me/simulated-devices/" + did, auth=auth, status=204)
+    request("DELETE", health + "/observations/" + receipt["items"][0]["observation_id"],
+            auth=auth, status=204)
+    request("POST", users + "/logout", auth=auth, status=204)
+    request("GET", users + "/me", auth=auth, status=401)
+    print("REGISTERED USER E2E PASS: login, consent, synthetic observations, robot simulation, feedback, revoke/logout")
+PY

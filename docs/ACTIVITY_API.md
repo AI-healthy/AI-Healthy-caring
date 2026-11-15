@@ -19,7 +19,7 @@ uvicorn shiyi_api.main:app --host 127.0.0.1 --port 8000
 ```
 
 不自动加载 .env。默认没有身份，受保护接口失效关闭；可在 Swagger /docs 中使用 Bearer token。
-仅为开发环境预配置随机令牌；不是生产登录、JWT、配对或正式授权系统。
+V0.4 也支持注册账号的本地登录令牌，见 [USER_HEALTH_API.md](USER_HEALTH_API.md)。两类身份均非生产登录、JWT、配对或正式授权系统。
 不要暴露公网、提交令牌或录入真实健康数据。数据库目录 private_data 已被 Git 忽略。
 重启服务时保留同一数据库路径和同一身份配置即可读回合成记录。
 SQLite 标准库实现用于降低初期依赖，生产迁移/SQLAlchemy 与 Alembic 留待团队确认。
@@ -37,7 +37,7 @@ SQLite 标准库实现用于降低初期依赖，生产迁移/SQLAlchemy 与 Ale
 
 ## 请求说明
 
-共同 Header：Authorization: Bearer <dev-token>
+共同 Header：Authorization: Bearer <access-token>（本地登录或预配置开发令牌）
 
 | 方法 | 路径（前缀 /api/v1/activities） | 请求 |
 | --- | --- | --- |
@@ -63,4 +63,4 @@ OpenAPI 与 /docs 由 FastAPI 直接生成。
 
 测试覆盖创建、执行、取消、过期、持久化重开、身份隔离、重试及非法转换。
 此 PR 不提交 App 代码或固件、不更新原生设备协议、不声称真实可穿戴数据或机器人已接通。
-XU-02 仍需与 wu/lan 确认设备契约、模拟器联调；XU-03 需要真机与正式部署验证。
+XU-02 已有本地模拟器联调，设备契约仍需与 wu/lan 确认；XU-03 需要真机与正式部署验证。

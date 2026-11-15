@@ -58,9 +58,11 @@ class ObservationInput(BaseModel):
             duration = self.observed_at - self.interval_start
             if duration <= timedelta(0) or duration > timedelta(days=1):
                 raise ValueError("Interval must be positive and at most 24 hours")
-            if self.metric == "sleep_minutes" and self.value is not None:
-                if timedelta(minutes=self.value) > duration:
-                    raise ValueError("Sleep duration exceeds observation interval")
+            if (
+                self.metric == "sleep_minutes" and self.value is not None
+                and timedelta(minutes=self.value) > duration
+            ):
+                raise ValueError("Sleep duration exceeds observation interval")
         elif self.interval_start is not None:
             raise ValueError("Point metric does not accept interval_start")
         return self

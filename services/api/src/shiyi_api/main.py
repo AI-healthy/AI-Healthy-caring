@@ -17,11 +17,12 @@ from .schemas import (
     RecommendationRequest,
     RecommendationResponse,
 )
+from .workbench import router as workbench_router
 
 app = FastAPI(
     title="ShiYi API (local activity MVP)",
     description="Local demo only. Accounts, activities and synthetic observations use SQLite.",
-    version="0.9.0",
+    version="1.0.0",
 )
 
 app.include_router(activity_router)
@@ -30,6 +31,7 @@ app.include_router(identity_router)
 app.include_router(health_router)
 app.include_router(harness_router)
 app.include_router(proactive_router)
+app.include_router(workbench_router)
 
 
 @app.exception_handler(RequestValidationError)

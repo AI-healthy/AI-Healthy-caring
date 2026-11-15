@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ShiYi · Harness Workbench</title>
+<style>
+:root{font-family:system-ui,"Microsoft YaHei",sans-serif;color:#213d32;background:#f3f6f1;font-size:15px}
+*{box-sizing:border-box}body{margin:0}main{max-width:1180px;margin:auto;padding:28px}
+header{border-bottom:1px solid #ccdcd0;margin-bottom:18px;padding-bottom:15px}
+h1{font-size:30px;letter-spacing:-.6px;margin:5px 0}h2{font-size:18px;margin:0 0 12px}h3{font-size:15px;margin:12px 0 5px}p{line-height:1.6}small,.muted{color:#567364}
+.tag{display:inline-block;padding:5px 10px;border-radius:20px;background:#e4ede4;color:#315641;font-size:12px;font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{background:white;border:1px solid #dce6dc;border-radius:14px;padding:18px;min-width:0}
+.wide{grid-column:1/-1}.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+button{border:0;background:#285e49;color:#fff;border-radius:8px;padding:9px 12px;font:inherit;cursor:pointer}
+button.secondary{background:#e8f0e9;color:#214934}button:disabled{opacity:.36;cursor:not-allowed}
+input,select{background:#f9fbf9;border:1px solid #c8d7cb;border-radius:6px;padding:8px;font:inherit;max-width:100%}
+label{display:inline-flex;align-items:center;gap:5px}.option{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0;background:#f1f6f1;padding:10px;border-radius:8px}
+pre{background:#f3f7f4;border-radius:8px;padding:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;font-size:12px;line-height:1.6}
+#notice{min-height:28px;color:#385f49;font-weight:600}#notice.error{color:#a33b2a}.warning{border-left:3px solid #8f7852;padding-left:10px;color:#6f5d3e}
+@media(max-width:760px){main{padding:16px}.grid{grid-template-columns:1fr}}
+</style></head>
+<body><main>
+<header><span class="tag">LOCAL DEMO · 合成数据</span><h1>时宜 / Agent Harness Workbench</h1>
+<p class="muted">开发联调工具 · 使用真实本地 API；机器人为模拟器。不是 Android 产品页面，也不会向真实设备发送动作。</p>
+<div class="controls"><button id="init">创建临时测试账号</button><button id="logout" class="secondary" data-login disabled>退出</button><span id="account">未登录</span><a href="/docs">OpenAPI 文档</a></div><div id="notice" role="status" aria-live="polite"></div></header>
+<div class="grid">
+<section class="panel"><h2>01 · Context & Memory</h2><p class="muted">合成状态与记忆开关。关闭后停止相应记忆使用。</p>
+<div class="controls"><label>偏好<select id="preference"><option value="">无</option><option value="culture">四时文化</option><option value="gentle">轻柔</option><option value="movement">运动</option><option value="music">音乐</option><option value="outdoor">户外</option></select></label><label><input id="feedbackMemory" type="checkbox" data-login disabled>体验记忆</label><label><input id="behaviorMemory" type="checkbox" data-login disabled>行为记忆</label></div>
+<div class="controls"><button id="save" data-login disabled>保存设置</button><button id="memory" class="secondary" data-login disabled>查看记忆</button><button id="reset" class="secondary" data-login disabled>重置记忆窗口</button></div><pre id="memoryOut">尚无记忆查询</pre></section>
+<section class="panel"><h2>02 · Agent Decision</h2><div class="controls"><label>可用分钟<input id="minutes" type="number" min="1" max="30" value="5" size="3"></label><label>模拟精力<select id="energy"><option value="">未知</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label></div><div class="controls"><button id="plan" data-login disabled>生成方案</button><button id="dismiss" class="secondary" disabled>拒绝方案</button></div><div id="options" aria-live="polite"></div><h3>运行阶段 Trace</h3><pre id="trace">等待方案</pre></section>
+<section class="panel"><h2>03 · Activity & Embodiment</h2><p id="session">无活动</p><div class="controls"><button id="start" disabled>开始活动</button><button id="robot" disabled>模拟表情与回执</button><button id="complete" disabled>用户确认完成</button><button id="cancel" class="secondary" disabled>取消</button></div>
+<div class="controls"><label>体验评分<select id="rating"><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></label><button id="feedback" disabled>提交体验反馈</button></div><pre id="deviceOut">尚无模拟命令</pre><p class="muted">模拟回执不等于用户完成活动。完成按钮需要单独点击。</p></section>
+<section class="panel"><h2>04 · Proactive Scheduler</h2><p>启动器已运行独立 worker。仅显式声明可用才生成邀请。</p><div class="controls"><button id="schedule" data-login disabled>授权未来30分钟（模拟端）</button><button id="pause" class="secondary" data-login disabled>暂停</button><button id="poll" class="secondary" data-login disabled>查询邀请</button></div><pre id="offerOut">默认关闭；无主动邀请</pre><p class="muted">沿用勿扰、冷却及活动门控。模拟端收执后仍需用户选择候选。此页面不自动弹通知。</p></section>
+<section class="panel wide"><h2>05 · API 调试记录</h2><p class="warning">只展示本次页面的业务请求路径、HTTP 状态和错误类别；不打印凭证或原始请求体。</p><pre id="logs">尚无调用</pre></section>
+</div></main><script src="/workbench/app.js" defer></script></body></html>

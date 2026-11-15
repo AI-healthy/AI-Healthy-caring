@@ -20,6 +20,8 @@ jobs:
         run: python -m pytest -q
       - name: Ruff
         run: python -m ruff check src tests
+      - name: Workbench JavaScript syntax
+        run: node --check src/shiyi_api/workbench_assets/app.js
       - name: HTTP simulator smoke test
         run: bash ../../scripts/demo_backend.sh
       - name: Synthetic harness benchmark

@@ -54,3 +54,5 @@ uvicorn shiyi_api.main:app --reload --port 8000
 主动陪伴调度与模拟邀请：[PROACTIVE_HARNESS.md](docs/PROACTIVE_HARNESS.md)（需要独立启动本地 worker；不实际推送）。
 
 Harness 合成评估：[HARNESS_BENCHMARK.md](docs/HARNESS_BENCHMARK.md)（V0.9，不代表真人健康效果）。
+
+V1.0 本地联调工作台：`bash scripts/run_local.sh`（临时合成数据库、可控调度器、仅 loopback）；详见 [LOCAL_WORKBENCH.md](docs/LOCAL_WORKBENCH.md)。不是生产部署或 Android/机器人实机验收。

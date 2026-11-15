@@ -21,3 +21,5 @@ Thumbs.db
 private_data/
 recordings/
 raw_health_exports/
+
+benchmark-results/

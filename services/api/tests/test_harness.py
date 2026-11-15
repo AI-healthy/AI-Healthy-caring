@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 from shiyi_api import storage
 from shiyi_api.harness.api import get_ranker
-from shiyi_api.harness.contracts import RunRequest
-from shiyi_api.harness.repository import create_run
+from shiyi_api.harness.contracts import RunRequest, Settings
+from shiyi_api.harness.repository import create_run, put_settings
 from shiyi_api.main import app
 
 ROOT = "/api/v1/harness"
@@ -215,3 +215,38 @@ def test_delete_observation_invalidates_pending_plan(client):
     assert client.delete(health + "/" + oid, headers=A).status_code == 204
     assert confirm(client, plan).status_code == 409
     assert confirm(client, other_plan, headers=B).status_code == 200
+
+
+def test_ranker_runs_outside_write_transaction_and_revalidates(client):
+    store = storage.get_store()
+
+    class ChangingRanker:
+        def rank(self, context, candidates):
+            # This would deadlock/fail inside the old BEGIN IMMEDIATE transaction.
+            put_settings(store, "alice", Settings(blocked_activity_ids=["culture"]))
+            return ["culture"]
+
+    plan = create_run(store, "alice", RunRequest(client_request_id="revalidate"), ChangingRanker())
+    assert plan.algorithm == "rules_v1"
+    assert "culture" not in [x.activity_id for x in plan.options]
+    assert plan.trace[-1].result == "context_changed_replanned"
+
+
+def test_ranker_rechecks_concurrent_proactive_offer(client):
+    settings(client, proactive_enabled=True)
+    store = storage.get_store()
+
+    class CompetingRanker:
+        def rank(self, context, candidates):
+            other = create_run(store, "alice", RunRequest(
+                client_request_id="other", trigger="scheduled_check"
+            ))
+            assert other.status == "AWAITING_CONFIRMATION"
+            return ["culture"]
+
+    plan = create_run(store, "alice", RunRequest(
+        client_request_id="competing", trigger="scheduled_check"
+    ), CompetingRanker())
+    assert plan.status == "NO_ACTION"
+    assert plan.reason == "cooldown"
+    assert plan.trace[-1].result == "context_changed_replanned"

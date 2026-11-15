@@ -153,6 +153,18 @@ def _proactive_reason(db, user, settings, now):
         return "daily_offer_limit"
     if times and times[0]["created_at"] > storage.stamp(now - timedelta(hours=4)):
         return "cooldown"
+    if db.execute(
+        """SELECT 1 FROM activity_sessions WHERE user_id=? AND status IN ('CREATED','RUNNING')
+           AND expires_at>? LIMIT 1""",
+        (user, storage.stamp(now)),
+    ).fetchone():
+        return "active_activity"
+    if db.execute(
+        """SELECT 1 FROM harness_runs WHERE user_id=? AND status='AWAITING_CONFIRMATION'
+           AND expires_at>? LIMIT 1""",
+        (user, storage.stamp(now)),
+    ).fetchone():
+        return "pending_plan"
     return None
 
 

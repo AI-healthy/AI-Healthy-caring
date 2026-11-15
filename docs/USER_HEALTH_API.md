@@ -30,7 +30,7 @@ PUT /api/v1/health/consents/{source}/{metric}
 
 请求：{"granted":true,"policy_version":"local-demo-v1"}。
 按用户、数据来源和指标单独授权，默认拒绝。授权事件有本地审计记录。
-撤回时设置 granted=false，事务保证后续请求停止入库；已有历史仅供本人审阅/删除，尚未接入 AI。
+撤回时设置 granted=false，事务保证后续请求停止入库；已有历史仍可供本人审阅/删除；V0.5 Harness 读取前再次校验有效授权，撤回即停止使用该类记录。
 这是后端合成数据采集开关，不等于 Health Connect 系统权限。Android 仍需验证授权及撤销。
 
 ## 观测上传
@@ -85,7 +85,7 @@ uvicorn shiyi_api.main:app --host 127.0.0.1 --port 8000
 ```
 
 进入 /docs → register → login → Authorize → consent → observations。
-新 API 不读取真实穿戴数据、不自动影响推荐、不外发记录至小智/LLM，
+新 API 不读取真实穿戴数据；V0.5 Harness 可在明确开启后使用最小合成自评记录，且不外发记录至小智/LLM，
 不安装 Android 或修改固件。后续 Agent Harness 应只通过经过授权的聚合查询读取最小必要数据。
 
 

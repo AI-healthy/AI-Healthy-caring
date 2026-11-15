@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from shiyi_api import storage
+from shiyi_api.harness.api import get_ranker
 from shiyi_api.harness.contracts import RunRequest
 from shiyi_api.harness.repository import create_run
 from shiyi_api.main import app
@@ -175,3 +176,42 @@ def test_raising_ranker_falls_back(client):
     plan = create_run(storage.get_store(), "alice", RunRequest(client_request_id="broken"),
                       BrokenRanker())
     assert plan.algorithm == "rules_v1_fallback"
+
+
+def test_server_side_ranker_dependency(client):
+    class CultureRanker:
+        def rank(self, context, candidates):
+            assert context.available_minutes == 5
+            return ["culture"]
+
+    app.dependency_overrides[get_ranker] = CultureRanker
+    try:
+        plan = run(client)
+        assert plan["algorithm"] == "adapter_v1"
+        assert [o["activity_id"] for o in plan["options"]] == ["culture"]
+        settings(client, blocked_activity_ids=["culture"])
+        result = run(client, "blocked")
+        assert result["algorithm"] == "rules_v1_fallback"
+        assert "culture" not in [o["activity_id"] for o in result["options"]]
+    finally:
+        app.dependency_overrides.pop(get_ranker, None)
+
+
+def test_active_activity_blocks_proactive(client):
+    settings(client, proactive_enabled=True)
+    pending = run(client)
+    assert run(client, "pending", trigger="scheduled_check")["reason"] == "pending_plan"
+    assert confirm(client, pending).status_code == 200
+    assert run(client, "active", trigger="scheduled_check")["reason"] == "active_activity"
+
+
+def test_delete_observation_invalidates_pending_plan(client):
+    settings(client, use_observations=True)
+    _observe(client, "fresh", 1, NOW - timedelta(minutes=1))
+    plan = run(client)
+    other_plan = run(client, headers=B)
+    health = "/api/v1/health/observations"
+    oid = client.get(health, headers=A).json()["items"][0]["observation_id"]
+    assert client.delete(health + "/" + oid, headers=A).status_code == 204
+    assert confirm(client, plan).status_code == 409
+    assert confirm(client, other_plan, headers=B).status_code == 200

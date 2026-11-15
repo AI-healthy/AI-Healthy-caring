@@ -6,10 +6,19 @@ from ..auth import current_user
 from ..storage import SessionStore, StoreError, get_store
 from . import repository
 from .contracts import ConfirmResult, MemoryView, RunRequest, RunView, Selection, Settings
+from .engine import Ranker
 
 router = APIRouter(prefix="/api/v1/harness", tags=["agent-harness"])
 User = Annotated[str, Depends(current_user)]
 Store = Annotated[SessionStore, Depends(get_store)]
+
+
+def get_ranker() -> Ranker | None:
+    """Trusted local strategy dependency; HTTP clients cannot select executable code."""
+    return None
+
+
+Strategy = Annotated[Ranker | None, Depends(get_ranker)]
 
 
 def call(operation, *args):
@@ -35,8 +44,8 @@ def memory(user: User, store: Store):
 
 
 @router.post("/runs", response_model=RunView)
-def run(payload: RunRequest, user: User, store: Store):
-    return call(repository.create_run, store, user, payload)
+def run(payload: RunRequest, user: User, store: Store, ranker: Strategy):
+    return call(repository.create_run, store, user, payload, ranker)
 
 
 @router.get("/runs/{run_id}", response_model=RunView)

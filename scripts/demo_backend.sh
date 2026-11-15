@@ -139,8 +139,21 @@ with httpx.Client(base_url="http://127.0.0.1:8000", timeout=10) as c:
     request("POST", health + "/observations", payload, auth, 403)
     bind = request("POST", users + "/me/simulated-devices", {"name":"Demo robot"}, auth, 201)
     did = bind["device"]["device_id"]
-    activity = request("POST", "/api/v1/activities/sessions", {"activity_id":"stretch"}, auth)
-    sid = activity["session_id"]
+    harness = "/api/v1/harness"
+    request("PUT", harness + "/settings", {
+        "preference_tags":["culture"], "use_feedback_memory":True,
+    }, auth)
+    plan = request("POST", harness + "/runs", {
+        "client_request_id":"registered-harness", "available_minutes":5,
+    }, auth)
+    assert plan["status"] == "AWAITING_CONFIRMATION"
+    aid = plan["options"][0]["activity_id"]
+    assert aid == "culture"
+    selection_path = harness + "/runs/" + plan["run_id"] + "/confirm"
+    confirmation = request("POST", selection_path, {"activity_id":aid}, auth)
+    sid = confirmation["session"]["session_id"]
+    assert confirmation["session"]["status"] == "CREATED"
+    assert request("POST", selection_path, {"activity_id":aid}, auth)["session"]["session_id"] == sid
     path = "/api/v1/activities/sessions/" + sid
     request("POST", path + "/start", auth=auth)
     request("POST", "/api/v1/devices/commands",
@@ -148,8 +161,15 @@ with httpx.Client(base_url="http://127.0.0.1:8000", timeout=10) as c:
     assert run_once(c, did, bind["device_token"])["command"]["status"] == "COMPLETED"
     request("POST", path + "/complete", auth=auth)
     request("POST", "/api/v1/activities/feedback",
-            {"session_id":sid,"activity_id":"stretch","completed":True,
+            {"session_id":sid,"activity_id":aid,"completed":True,"enjoyment":5,
              "client_event_id":"registered-feedback"}, auth)
+    memory = request("GET", harness + "/memory", auth=auth)
+    assert memory["entries"][0]["activity_id"] == aid
+    assert memory["entries"][0]["score"] > 0
+    assert request("POST", harness + "/runs", {
+        "client_request_id":"scheduled-disabled", "trigger":"scheduled_check",
+    }, auth)["reason"] == "proactive_disabled"
+    print("HARNESS E2E PASS: consent-aware planning, explicit confirmation, activity feedback memory")
     request("DELETE", users + "/me/simulated-devices/" + did, auth=auth, status=204)
     request("DELETE", health + "/observations/" + receipt["items"][0]["observation_id"],
             auth=auth, status=204)

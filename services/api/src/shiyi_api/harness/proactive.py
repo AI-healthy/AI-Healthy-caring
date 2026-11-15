@@ -169,6 +169,15 @@ def _delivery_allowed(db, user, schedule, now):
     ).fetchone() is None
 
 
+def offer_confirmable(db, user, run_id, now):
+    # Legacy manual runs are unaffected; new scheduled offers are rechecked at acceptance.
+    if not db.execute(
+        "SELECT 1 FROM proactive_offers WHERE user_id=? AND run_id=?", (user, run_id)
+    ).fetchone():
+        return True
+    return _delivery_allowed(db, user, _schedule(db, user), now)
+
+
 def _current_offer(db, user, now):
     db.execute(
         """UPDATE harness_runs SET status='EXPIRED' WHERE user_id=?

@@ -93,6 +93,11 @@ def put_settings(store, user, payload):
             (user, payload.model_dump_json(), since),
         )
         invalidate_pending(db, user)
+        if previous.proactive_enabled and not payload.proactive_enabled:
+            db.execute(
+                """UPDATE proactive_schedules SET available_until=NULL,next_check_at=NULL,
+                   last_reason='proactive_disabled' WHERE user_id=?""", (user,)
+            )
     return payload
 
 
@@ -369,11 +374,14 @@ def confirm(store, user, run_id, selection):
         elif selection.activity_id not in {x.activity_id for x in run.options}:
             error = StoreError(422, "Choose an offered activity")
         else:
+            from .proactive import offer_confirmable
+
             settings, _ = _settings(db, user)
             entry = get_activity(selection.activity_id)
             offered = next(x for x in run.options if x.activity_id == selection.activity_id)
             if (entry is None or entry[2] != offered.duration_minutes
-                    or selection.activity_id in settings.blocked_activity_ids):
+                    or selection.activity_id in settings.blocked_activity_ids
+                    or not offer_confirmable(db, user, run_id, now)):
                 db.execute("UPDATE harness_runs SET status='INVALIDATED' WHERE run_id=?", (run_id,))
                 error = StoreError(409, "Activity no longer eligible")
             else:

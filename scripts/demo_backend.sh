@@ -177,3 +177,51 @@ with httpx.Client(base_url="http://127.0.0.1:8000", timeout=10) as c:
     request("GET", users + "/me", auth=auth, status=401)
     print("REGISTERED USER E2E PASS: login, consent, synthetic observations, robot simulation, feedback, revoke/logout")
 PY
+
+python - <<'PY'
+import secrets
+import subprocess
+import sys
+from datetime import UTC, datetime, timedelta
+import httpx
+from shiyi_api.harness.invitation_simulator import poll_once
+
+with httpx.Client(base_url="http://127.0.0.1:8000", timeout=10) as c:
+    def request(method, path, data=None, auth=None, status=200):
+        res = c.request(method, path, json=data, headers=auth)
+        assert res.status_code == status, f"{method} {path}: {res.status_code}"
+        return res.json() if status != 204 else None
+
+    credentials = {"username":"synthetic_proactive","password":secrets.token_urlsafe(24)}
+    request("POST", "/api/v1/users/register", credentials, status=201)
+    login = request("POST", "/api/v1/users/login", credentials)
+    auth = {"Authorization":"Bearer " + login["access_token"]}
+    bind = request("POST", "/api/v1/users/me/simulated-devices", {"name":"Invitation demo"}, auth, 201)
+    did = bind["device"]["device_id"]
+    now = datetime.now(UTC)
+    h = "/api/v1/harness"
+    p = "/api/v1/proactive"
+    request("PUT", h + "/settings", {
+        "proactive_enabled":True,"timezone":"UTC",
+        "quiet_start":(now + timedelta(hours=1)).time().isoformat(),
+        "quiet_end":(now + timedelta(hours=2)).time().isoformat(),
+    }, auth)
+    request("PUT", p + "/schedule", {
+        "enabled":True,"channel":"simulator","device_id":did,
+        "available_for_minutes":30,"available_minutes":5,
+    }, auth)
+    subprocess.run([sys.executable, "-m", "shiyi_api.harness.scheduler", "--once"], check=True)
+    invitation = request("GET", p + "/offers/pending", auth=auth)
+    assert invitation["run"]["status"] == "AWAITING_CONFIRMATION"
+    message = poll_once(c, did, bind["device_token"])
+    assert message is not None and message[0].offer_id == invitation["offer_id"]
+    assert poll_once(c, did, bind["device_token"]) is None
+    run = invitation["run"]
+    assert request("GET", p + "/offers/pending", auth=auth)["run"]["session_id"] is None
+    aid = run["options"][0]["activity_id"]
+    confirmed = request("POST", h + "/runs/" + run["run_id"] + "/confirm", {"activity_id":aid}, auth)
+    assert confirmed["session"]["status"] == "CREATED"
+    request("PUT", p + "/schedule", {"enabled":False}, auth)
+    assert request("GET", p + "/offers/pending", auth=auth) is None
+    print("PROACTIVE E2E PASS: standalone scheduler -> simulator pull/ACK -> explicit user confirmation")
+PY

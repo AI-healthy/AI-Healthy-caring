@@ -60,7 +60,9 @@ def update_consent(store, user, source, metric, payload):
             (user, source, metric),
         ).fetchone()
         if row and bool(row["granted"]) == payload.granted:
-            return dict(row)
+            return {key: row[key] for key in (
+                "source", "metric", "granted", "policy_version", "updated_at"
+            )}
         db.execute(
             """INSERT INTO health_consents VALUES (?,?,?,?,?,?)
                ON CONFLICT(user_id,source,metric) DO UPDATE SET

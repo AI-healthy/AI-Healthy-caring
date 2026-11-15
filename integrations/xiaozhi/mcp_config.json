@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "shiyi": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "shiyi_api.mcp_server"
+      ],
+      "tools": {
+        "allow": [
+          "get_shiyi_season_card",
+          "recommend_shiyi_activity"
+        ]
+      }
+    }
+  }
+}

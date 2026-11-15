@@ -44,6 +44,7 @@ class RecommendationResponse(BaseModel):
 class FeedbackRequest(BaseModel):
     activity_id: str = Field(min_length=1, max_length=64)
     completed: bool
+    session_id: str | None = Field(default=None, min_length=1, max_length=80)
     enjoyment: int | None = Field(default=None, ge=1, le=5)
     perceived_energy_after: int | None = Field(default=None, ge=1, le=5)
     client_event_id: str = Field(min_length=1, max_length=80)
@@ -53,4 +54,23 @@ class FeedbackResponse(BaseModel):
     accepted: bool
     event_id: str
     duplicate: bool = False
-    notice: str = "已接收反馈；当前演示服务未进行长期个人数据存储。"
+    notice: str = "已接收反馈；仅存储于本地开发数据库，不用于医疗判断。"
+
+
+class SessionCreate(BaseModel):
+    activity_id: str = Field(min_length=1, max_length=64)
+    client_request_id: str | None = Field(default=None, min_length=1, max_length=80)
+
+
+class SessionResponse(BaseModel):
+    session_id: str
+    client_request_id: str | None
+    activity_id: str
+    title: str
+    duration_minutes: int
+    status: Literal["CREATED", "RUNNING", "COMPLETED", "CANCELLED", "EXPIRED"]
+    created_at: datetime
+    started_at: datetime | None
+    ended_at: datetime | None
+    expires_at: datetime
+    is_demo: Literal[True] = True

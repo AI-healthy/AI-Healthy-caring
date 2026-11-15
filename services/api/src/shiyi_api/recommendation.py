@@ -35,3 +35,13 @@ def get_recommendations(request: RecommendationRequest) -> list[ActivityOption]:
         )
     scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return [item[2] for item in scored[:3]]
+
+
+def get_activity(activity_id: str):
+    """Resolve an existing low-risk catalog entry; never trust client durations."""
+    return next((entry for entry in _CATALOG if entry[0] == activity_id), None)
+
+
+def catalog_entries() -> tuple:
+    """Immutable snapshot for allowlisted harness candidate generation."""
+    return tuple(_CATALOG)

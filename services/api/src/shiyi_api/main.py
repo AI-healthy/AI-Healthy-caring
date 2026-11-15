@@ -2,23 +2,45 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
+from .activity_api import router as activity_router
+from .device_api import router as device_router
+from .harness.api import router as harness_router
+from .harness.proactive_api import router as proactive_router
+from .health_api import router as health_router
+from .identity_api import router as identity_router
 from .recommendation import get_recommendations
 from .schemas import (
-    FeedbackRequest,
-    FeedbackResponse,
     RecommendationRequest,
     RecommendationResponse,
 )
+from .workbench import router as workbench_router
 
 app = FastAPI(
-    title="ShiYi API (development starter)",
-    description="Local demo endpoints only. No authentication or health-data persistence.",
-    version="0.1.0",
+    title="ShiYi API (local activity MVP)",
+    description="Local demo only. Accounts, activities and synthetic observations use SQLite.",
+    version="1.0.0",
 )
 
-_demo_seen_events: set[str] = set()
+app.include_router(activity_router)
+app.include_router(device_router)
+app.include_router(identity_router)
+app.include_router(health_router)
+app.include_router(harness_router)
+app.include_router(proactive_router)
+app.include_router(workbench_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_request: Request, exc: RequestValidationError):
+    # Never reflect raw password, credential or observation values in errors.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": list(error["loc"]), "type": error["type"], "msg": "Invalid input"}
+        for error in exc.errors()
+    ]})
 
 
 @app.get("/api/v1/health")
@@ -50,11 +72,3 @@ def recommend(payload: RecommendationRequest) -> RecommendationResponse:
         data_notice="规则推荐演示，不代表穿戴数据已经接入。",
     )
 
-
-@app.post("/api/v1/activities/feedback", response_model=FeedbackResponse)
-def feedback(payload: FeedbackRequest) -> FeedbackResponse:
-    duplicate = payload.client_event_id in _demo_seen_events
-    _demo_seen_events.add(payload.client_event_id)
-    return FeedbackResponse(
-        accepted=True, event_id=payload.client_event_id, duplicate=duplicate,
-    )

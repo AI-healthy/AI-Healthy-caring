@@ -39,13 +39,10 @@ def test_invalid_energy_fails_validation():
     assert response.status_code == 422
 
 
-def test_feedback_is_idempotent_in_demo_process():
-    payload = {"activity_id": "stretch", "completed": True, "client_event_id": "test-unique-e1"}
-    one = client.post("/api/v1/activities/feedback", json=payload)
-    two = client.post("/api/v1/activities/feedback", json=payload)
-    assert one.status_code == two.status_code == 200
-    assert one.json()["duplicate"] is False
-    assert two.json()["duplicate"] is True
+def test_feedback_requires_identity():
+    payload = {"activity_id": "stretch", "completed": True, "client_event_id": "e1"}
+    response = client.post("/api/v1/activities/feedback", json=payload)
+    assert response.status_code == 401
 
 
 def test_season_is_clearly_marked_demo():

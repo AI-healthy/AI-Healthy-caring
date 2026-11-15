@@ -35,7 +35,7 @@ flowchart LR
 | 知识库 | 证据可追溯的四类内容、地域与节气分类 | 将民俗宣称为有效治疗 |
 | Jev | 非医疗意图路由、活动排序与提醒选择 | 药物禁忌安全终裁 |
 
-## 3. 核心数据模型（后续实现）
+## 3. 核心数据模型（逐步实现）
 
 `User`、`Device`、`Consent`、`HealthObservation`、`CheckIn`、`ActivityCatalog`、`Recommendation`、`ActivitySession`、`ExperienceFeedback`、`KnowledgeCard`、`SeasonTheme`。
 
@@ -70,7 +70,9 @@ sequenceDiagram
 
 ## 5. 后端模块与 MVP API
 
-当前实现：`GET /api/v1/health`、`GET /api/v1/seasons/current`（固定演示卡）、`POST /api/v1/recommendations`（规则演示）、`POST /api/v1/activities/feedback`（内存幂等演示）。
+当前实现：`GET /api/v1/health`、`GET /api/v1/seasons/current`（固定演示卡）、`POST /api/v1/recommendations`（规则演示）、`POST /api/v1/activities/feedback`（SQLite 持久化、开发身份隔离）。
+
+本地账号、可撤销登录令牌、来源/指标授权、合成健康观测已新增；见 [USER_HEALTH_API.md](USER_HEALTH_API.md)。真实数据接入须隐私与部署审查，未自动输入 AI。
 
 未来按领域划分：`identity`、`consent`、`state`、`seasons`、`knowledge`、`recommendations`、`activities`、`devices`。
 
@@ -82,7 +84,7 @@ sequenceDiagram
 
 每条命令包含 `schema_version`、`command_id`、`correlation_id`、`device_id`、`type`、`payload`、`expires_at`；回执包含事件 ID、发生时间及对应命令。执行必须幂等、参数白名单、动作边界、鉴权和超时；正式联网要求 TLS。
 
-硬件协议、固件烧录、摄像头与穿戴数据均**尚未在实机验证**。
+本地设备命令与回执通过 REST 模拟，当前仅允许 SET_EXPRESSION；设备身份为独立开发令牌。MCP 只读工具通过 stdio 接入桥接器。详细边界见 [INTEGRATION.md](INTEGRATION.md)。硬件协议、真机 AI 工具调用、摄像头与穿戴数据均**尚未在代码联调中验证**。
 
 ## 7. AI 推荐与安全
 
@@ -114,3 +116,6 @@ sequenceDiagram
 - Android、后端、嵌入式、设计的负责人。
 
 参考：https://docs.m5stack.com/en/StackChan · https://developer.android.com/health-and-fitness/health-connect
+
+## Agent Harness V0.5
+本地有界决策框架实现用户触发、授权自评、反馈偏好记忆、候选过滤、可插拔 Ranker、确认后创建活动与 trace；主动陪伴仅判断是否生成建议。详见 [HARNESS.md](HARNESS.md)，未接入外部 LLM/RAG、后台推送或真实机器人。

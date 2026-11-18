@@ -27,15 +27,22 @@
 以运行服务的 OpenAPI 为准。设备回执契约仍待 lan 联调确认。
 
 
-## 本地模拟设备命令（0.1-draft）
+## 本地模拟设备命令（0.2-draft · LAN-02）
 
 REST: POST /api/v1/devices/commands; GET /api/v1/devices/commands/{command_id}
 使用开发用户身份。GET /api/v1/devices/{device_id}/pending 与 POST
-/api/v1/devices/{device_id}/events 使用独立设备令牌。当前只允许 SET_EXPRESSION
-三个预设；命令必须绑定运行中的活动会话，60 秒内有效（不超过会话截止）。
-ACK 与完成/失败事件按事件 ID 去重。活动完成由用户确认，不能由机器人表达回执代替。
-所有消息 is_demo=true。这不是 M5Stack 原生协议，也不是生产设备绑定。
-详见 [XU-02 联调指南](../../docs/INTEGRATION.md) 和 OpenAPI。
+/api/v1/devices/{device_id}/events 使用独立设备令牌。
+
+六类白名单：`SET_EXPRESSION`、`SPEAK_TEXT`、`PLAY_GUIDE`、`SHOW_TIMER`、
+`MOVE_HEAD_PRESET`、`CANCEL_TASK`。命令必须绑定运行中的活动会话，60 秒内有效
+（不超过会话截止）；payload 严格校验，未知类型/越界参数/额外字段返回 422。
+ACK 与完成/失败事件按事件 ID 去重；触摸确认/拒绝通过 `reason` 区分。
+活动完成仍由用户确认，不能由机器人回执代替。所有消息 is_demo=true。
+这不是 M5Stack 原生协议，也不是生产设备绑定。
+详见 [LAN-02 设备协议](../../docs/LAN_DEVICE_PROTOCOL.md)、
+[设备能力矩阵](../../docs/STACKCHAN_DEVICE_PROFILE.md) 与 OpenAPI。
+示例：`stackchan-command.example.json`、`stackchan-play-guide.example.json`、
+`stackchan-event-declined.example.json`。
 
 ## 用户与健康记录（V0.4）
 账号注册/登录/退出/个人资料：/api/v1/users；按 source+metric 授权及合成观测：/api/v1/health/consents、/api/v1/health/observations。

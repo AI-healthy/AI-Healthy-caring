@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.1-draft",
+  "event_id": "evt-demo-declined-001",
+  "device_id": "stackchan-example",
+  "type": "COMMAND_FAILED",
+  "command_id": "cmd-demo-guide-001",
+  "occurred_at": "2026-11-11T11:59:10+08:00",
+  "reason": "user_declined",
+  "elapsed_seconds": 90,
+  "is_demo": true
+}

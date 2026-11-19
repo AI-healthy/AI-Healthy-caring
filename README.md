@@ -4,7 +4,7 @@
 >
 > 第二十届全国大学生软件创新大赛 · AI + 健康赛道
 
-**状态：本地后端 MVP，非可交付产品。** 本地 Agent Harness、账号与合成健康数据授权、活动与反馈 SQLite 持久化、设备模拟 REST、MCP 只读工具；Android、Stack-chan 原生固件与真实穿戴数据尚未经代码联调。
+**状态：V1.0 Alpha 本地集成基线（PR #5 已合并 main），非正式发布产品。** 本地 Agent Harness、账号与合成健康数据授权、活动与反馈 SQLite 持久化、设备模拟 REST、MCP 只读工具；Android、Stack-chan 原生固件与真实穿戴数据尚未经代码联调。
 
 ## 组成
 
@@ -15,6 +15,25 @@
 - `simulators/`：离线 Stack-chan 指令模拟器
 - `docs/`：系统架构、决策记录、协作规范
 - `.github/workflows/`：后端持续集成
+
+## 新成员快速开始
+
+Python 3.11+，建议 3.12；首次安装依赖需联网。仓库根目录：
+
+**Windows PowerShell**（新脚本，尚需 Windows 实机验收）
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
+```
+
+**Linux / Ubuntu / macOS**
+```bash
+bash scripts/run_local.sh
+```
+
+打开 http://127.0.0.1:8000/workbench 体验本地完整闭环，或 http://127.0.0.1:8000/docs 查看 OpenAPI。启动器使用一次性合成数据库，停止后清理。勿用于真实健康数据或公网部署。
+
+团队成员从 main 拉取统一基线后，在各自功能分支开发；已有未提交改动请先保存，勿强推 main。
+交接与工作包见 [TEAM_TASKS.md](docs/TEAM_TASKS.md) 和 [TEAM_HANDOFF.md](docs/TEAM_HANDOFF.md)。
 
 ## 本地运行后端
 
@@ -55,4 +74,4 @@ uvicorn shiyi_api.main:app --reload --port 8000
 
 Harness 合成评估：[HARNESS_BENCHMARK.md](docs/HARNESS_BENCHMARK.md)（V0.9，不代表真人健康效果）。
 
-V1.0 本地联调工作台：`bash scripts/run_local.sh`（临时合成数据库、可控调度器、仅 loopback）；详见 [LOCAL_WORKBENCH.md](docs/LOCAL_WORKBENCH.md)。不是生产部署或 Android/机器人实机验收。
+V1.0 本地联调工作台：见上述跨平台启动方式（临时合成数据库、可控调度器、仅 loopback）；详见 [LOCAL_WORKBENCH.md](docs/LOCAL_WORKBENCH.md)。不是生产部署或 Android/机器人实机验收。

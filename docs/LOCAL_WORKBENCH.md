@@ -3,11 +3,17 @@
 从仓库根目录执行：
 ```bash
 git fetch origin
-git switch feat/xu-session-api
+git switch main
 git pull --ff-only
 bash scripts/run_local.sh
 # 可选： bash scripts/run_local.sh --port 8080
 ```
+Windows PowerShell 可改用：
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
+# 可指定端口： ... -Port 8080
+```
+该脚本无需激活 venv，无需永久修改执行策略；Windows 原生验收仍待完成。
 Python 3.11+；首次安装依赖需联网。访问 http://127.0.0.1:8000/workbench（或指定端口）。
 脚本启动本地 Uvicorn 和独立 scheduler，共享临时 SQLite；忽略既有 SHIYI_DB_PATH、开发身份和模型配置，
 强制使用规则和空的预配置身份。Ctrl+C / SIGTERM 停止进程并清理临时目录；强制 kill -9 时无法保证清理。

@@ -138,7 +138,7 @@ App/用户  ──POST /activities/sessions/{id}/complete──► API → COMPL
 
 ## 7. 未完成（不得写成已完成）
 
-- 真实 K151 固件与 BSP 编译/上板；
+- K151 固件骨架已提交（`firmware/stackchan/`），但**尚未编译、未上板**；
 - TLS、设备配对、短期凭据、限频；
 - WebSocket/MQTT 适配器；
 - 离线队列的磁盘持久化与容量上限（Python 运行时已有 spool，固件待做）；

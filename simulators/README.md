@@ -26,5 +26,6 @@ python -m shiyi_api.device_runtime --once --touch confirm --speed 0
 python -m shiyi_api.device_runtime --drain --speed 0
 ```
 
-完整演示：`bash scripts/demo_lan.sh`；测试见
+完整演示：`bash scripts/demo_lan.sh`（HTTP）或
+`python -m shiyi_api.lan_demo`（进程内，CI 使用）；测试见
 `services/api/tests/test_lan_protocol.py`。仍为**模拟器**，不是 K151 实机。

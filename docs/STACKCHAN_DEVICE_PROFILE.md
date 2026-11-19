@@ -90,5 +90,6 @@ K151 有 1W 扬声器，但**官方 BSP 不提供离线 TTS**。因此 `SPEAK_TE
 
 - 协议：[docs/LAN_DEVICE_PROTOCOL.md](LAN_DEVICE_PROTOCOL.md)
 - 设备运行时：`services/api/src/shiyi_api/device_runtime.py`
-- 演示脚本：`scripts/demo_lan.sh`
-- 未完成项：真实固件、音频方案、跌倒检测、配对与 TLS。
+- 固件骨架：`firmware/stackchan/`（PlatformIO + BSP，**未编译/未上板**）
+- 演示：`python -m shiyi_api.lan_demo`（进程内）或 `bash scripts/demo_lan.sh`（HTTP）
+- 未完成项：固件编译与实机验证、音频方案、跌倒检测、配对与 TLS。

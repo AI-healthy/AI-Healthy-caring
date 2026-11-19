@@ -10,7 +10,7 @@
 
 - `apps/android/`：Kotlin + Jetpack Compose，今日／四时／探索／我的
 - `services/api/`：FastAPI、规则推荐、演示节气内容、持久化活动与反馈、设备模拟接口
-- `firmware/stackchan/`：Stack-chan K151 接入边界；能力矩阵与上板清单已就绪，固件待实机
+- `firmware/stackchan/`：K151 固件骨架（白名单/ACK/NVS 恢复），待编译与上板
 - `packages/contracts/`：跨端与六类设备白名单命令示例
 - `simulators/`：离线单命令校验与有状态设备运行时（ACK/触摸/离线补发）
 - `docs/`：系统架构、决策记录、协作规范

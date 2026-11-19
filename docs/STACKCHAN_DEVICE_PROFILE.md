@@ -20,15 +20,19 @@
 
 | 能力 | 硬件/接口 | 本项目用法 | 状态 |
 | --- | --- | --- | --- |
-| 320×240 屏幕 | CoreS3 显示屏 | 表情、字幕、计时 | 规格确认；待实机 |
-| 表情 | 固件本地绘制 | `SET_EXPRESSION`：happy / neutral / sleepy | 协议已模拟；待实机 |
-| 头颈动作 | 2× SCS 总线舵机 | `MOVE_HEAD_PRESET`：nod / shake / tilt / look_around / greet | 角度已定；待实机 |
+| 320×240 屏幕 | CoreS3 显示屏 | 表情、字幕、计时 | 规格确认；表情已实机 |
+| 表情 | 固件本地绘制 | `SET_EXPRESSION`：happy / neutral / sleepy | **已实机**（基础表情响应，2026-11-19） |
+| 头颈动作 | 2× SCS 总线舵机 | `MOVE_HEAD_PRESET`：nod / shake / tilt / look_around / greet | **已实机**（动作正常；限位待记录） |
 | 12 路 RGB | 机身 IO 扩展 | 状态灯、告警、呼吸 | 规格确认；待实机 |
 | 三区触摸 | Si12T（front/middle/back） | 触摸确认/拒绝、唤醒 | 规格确认；待实机 |
 | 扬声器 | 1W 喇叭 | 提示音；语音内容待 TTS 方案 | **部分待定**（见第 4 节） |
+| 语音唤醒 | CoreS3 麦克风 + 设备现有固件 | 仅现有固件验证；本仓库固件未实现唤醒词 | **已实机**（现有固件） |
 | 9 轴 IMU | CoreS3 | 摇晃/跌倒检测（后续） | 规格确认；待实机 |
-| 麦克风/摄像头 | CoreS3 | **MVP 不使用**，不上传音频/图像 | 明确排除 |
+| 麦克风/摄像头 | CoreS3 | **MVP 不使用**，不上传音频/图像 | 明确排除（语音唤醒除外） |
 | NFC/红外 | 机身 | MVP 不使用 | 明确排除 |
+
+> 实机记录与证据边界见 [STACKCHAN_HARDWARE_TEST_LOG.md](STACKCHAN_HARDWARE_TEST_LOG.md)。
+> “已实机”指 K151 现有固件的基础能力验证，不代表本仓库固件已编译/烧录。
 
 ## 3. 舵机安全约定
 
@@ -73,7 +77,8 @@ K151 有 1W 扬声器，但**官方 BSP 不提供离线 TTS**。因此 `SPEAK_TE
 
 ## 6. 上板验证清单（LAN-01 验收）
 
-到货后按顺序执行并记录日志/照片：
+2026-11-19 已完成现有固件的动作、语音唤醒、表情响应实机验证（见
+[STACKCHAN_HARDWARE_TEST_LOG.md](STACKCHAN_HARDWARE_TEST_LOG.md)）。以下为本仓库固件的完整验收清单：
 
 1. 烧录 `firmware/stackchan`（`pio run -e stackchan-selftest -t upload`），确认屏幕、舵机、RGB、触摸、IMU 自检输出。
 2. 跑 `Servo/BasicMovement`，记录 X/Y 实际极限，校准中位（必要时用 `HomeCalibration`）。

@@ -12,6 +12,7 @@
 | `include/board_config.h` | 轮询周期、限位、文本上限 |
 | `include/device_protocol.h` / `src/device_protocol.cpp` | 白名单解析、payload 二次校验、事件构造 |
 | `src/main.cpp` | Wi-Fi + REST 轮询、ACK/终态、触摸、NVS 恢复 |
+| `src/selftest.cpp` | LAN-01 硬件自检（屏幕/舵机/12 灯/喇叭/三区触摸/IMU） |
 | `include/secrets.example.h` | Wi-Fi SSID/密码、设备 token |
 
 ## 构建
@@ -25,6 +26,18 @@ pio device monitor -b 115200
 ```
 
 `secrets.h` 已在根 `.gitignore` 中，不要提交。
+
+## LAN-01 硬件自检
+
+不需要 Wi-Fi，串口打印 PASS/FAIL，按提示触摸三个区域：
+
+```bash
+pio run -e stackchan-selftest -t upload
+pio device monitor -b 115200
+```
+
+自检覆盖：屏幕颜色/文字、X/Y 舵机往返、12 路 RGB、喇叭双音、front/middle/back 三区触摸、
+IMU 加速度读取。把串口输出贴进上板记录即可作为 LAN-01 的手工验收证据。
 
 ## 已实现
 

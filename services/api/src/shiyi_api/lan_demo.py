@@ -83,6 +83,27 @@ def main() -> int:
         assert running.json()["status"] == "RUNNING"
         print("[LAN-03] robot receipt COMPLETED; activity is still RUNNING until user confirms")
 
+        decline = client.post(
+            "/api/v1/devices/commands",
+            headers=user,
+            json={
+                "session_id": session_id,
+                "device_id": "sim",
+                "client_request_id": "lan-demo-decline",
+                "command_type": "PLAY_GUIDE",
+                "payload": {
+                    "guide_id": "stretch-5min",
+                    "title": "5 分钟肩颈放松",
+                    "duration_seconds": 300,
+                },
+            },
+        )
+        decline.raise_for_status()
+        declined = runtime.run_once(touch="decline")
+        assert declined is not None and declined.status == "FAILED", declined
+        assert declined.reason == "user_declined"
+        print(f"[LAN-03] touch decline -> {declined.status} ({declined.reason})")
+
         for key, command_type, payload in (
             ("lan-demo-speak", "SPEAK_TEXT", {"text": "慢慢来，先放松肩膀。"}),
             ("lan-demo-head", "MOVE_HEAD_PRESET", {"preset": "nod"}),

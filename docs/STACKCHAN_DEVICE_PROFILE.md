@@ -75,12 +75,12 @@ K151 有 1W 扬声器，但**官方 BSP 不提供离线 TTS**。因此 `SPEAK_TE
 
 到货后按顺序执行并记录日志/照片：
 
-1. 烧录官方 BSP 示例，确认屏幕、背光、触摸芯片初始化成功。
+1. 烧录 `firmware/stackchan`（`pio run -e stackchan-selftest -t upload`），确认屏幕、舵机、RGB、触摸、IMU 自检输出。
 2. 跑 `Servo/BasicMovement`，记录 X/Y 实际极限，校准中位（必要时用 `HomeCalibration`）。
 3. 跑 `RGB_LED`，确认 12 颗灯序号与左右分布。
 4. 跑 `TouchSensor`，记录 front/middle/back 三区与实际触摸位置对应关系。
 5. 播放 1kHz 提示音，确认音量档位与静音。
-6. 烧录本项目固件骨架（待提交），验证 `SET_EXPRESSION` 三档表情。
+6. 烧录 `stackchan-k151` 环境，验证 `SET_EXPRESSION` 三档表情。
 7. 验证 `MOVE_HEAD_PRESET` 五个动作，确认无顶限位、无异响。
 8. 断网 60s，验证本地表情/触摸仍可用，重连后补发回执。
 9. 触摸确认/拒绝，核对 `COMMAND_COMPLETED/FAILED` 的 `reason`。

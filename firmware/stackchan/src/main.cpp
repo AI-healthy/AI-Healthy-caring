@@ -13,6 +13,10 @@
 #include "board_config.h"
 #include "device_protocol.h"
 
+#ifdef HC_SELFTEST
+#include "selftest.h"
+#endif
+
 #if __has_include("secrets.h")
 #include "secrets.h"
 #endif
@@ -381,6 +385,14 @@ void setup() {
   M5.Display.fillScreen(kBackground);
   draw_centered("ShiYi Stack-chan", 80, kText, 2);
   draw_centered("LAN-01 firmware skeleton", 115, 0xAD55, 1);
+
+#ifdef HC_SELFTEST
+  run_selftest();
+  while (true) {
+    M5StackChan.update();
+    delay(100);
+  }
+#endif
 
   M5StackChan.Motion.setAutoTorqueReleaseEnabled(false);
   M5StackChan.Motion.goHome(400);

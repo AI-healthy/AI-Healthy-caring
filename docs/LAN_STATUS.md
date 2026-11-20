@@ -45,7 +45,9 @@ python -m shiyi_api.lan_demo               # 5 分钟伸展演示（无需 uvico
 ### 2.3 固件
 
 - `firmware/stackchan/`：PlatformIO 工程、白名单解析、ACK/终态、NVS 恢复、自检模式
-- **未编译、未上板**：当前环境下载 PlatformIO 平台包被沙箱拦截，README 已如实标注
+- **已编译（CI）**：Firmware CI 在 Ubuntu 上通过 pioarduino（Arduino core 3.x）编译
+  `stackchan-k151` 与 `stackchan-selftest`
+- **未上板**：尚未烧录到 K151，实机仅验证了设备现有固件的基础能力
 
 ## 3. 真机剩余项（K151 已到货，基础能力已验证）
 
@@ -78,10 +80,12 @@ python -m shiyi_api.lan_demo               # 5 分钟伸展演示（无需 uvico
 | `437cf02` | LAN-01 自检固件、触摸拒绝演示路径 |
 | `4dec7c2` | LAN 验收状态与真机阻塞记录 |
 | `a529938` | K151 实机记录（动作 / 语音唤醒 / 表情） |
+| `d28bc2d` | Firmware CI（Linux） |
+| `6986134` | 修复 Ruff 导入/异常检查 |
+| `ddabc4a` | 切换到 Arduino core 3（pioarduino），固件 CI 编译通过 |
 
-> 分支已推送到 GitHub：`origin/feat/lan-stackchan-control`（2026-11-19）。
+> 分支已推送到 GitHub：`origin/feat/lan-stackchan-control`（2026-11-19），PR #9。
 > 后续以 PR 形式请求 review；接口变更需与 xu 同步。
 >
-> 固件编译尝试：PlatformIO 6.2 + espressif32 6.13 工具链安装成功，但本机 Windows
-> SCons/GCC 组合在 `@response-file` 路径上存在兼容问题，源码尚未真正进入编译阶段。
-> 这是构建环境问题，不代表固件源码已通过或失败；换 Linux CI/另一台机器可继续验证。
+> 本机 Windows 的 SCons/GCC 响应文件兼容问题只影响本地编译；Firmware CI 的 Ubuntu
+> 环境已成功编译两个 env，证明固件源码可构建。上板仍需真机验证。

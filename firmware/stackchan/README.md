@@ -1,10 +1,11 @@
 # Stack-chan 固件接入（K151）
 
-**状态：K151 硬件基础能力已实机验证（动作/语音唤醒/表情），本目录固件仍未上板。**
+**状态：K151 硬件基础能力已实机验证（动作/语音唤醒/表情）；本目录固件已通过 Linux CI 编译，但仍未上板。**
 实机验证使用的是设备现有固件，详见
-[实机测试记录](../../docs/STACKCHAN_HARDWARE_TEST_LOG.md)。本仓库 PlatformIO 工程尚未执行
-`pio run`，也未烧录到 K151；请按
-[设备能力与上板清单](../../docs/STACKCHAN_DEVICE_PROFILE.md) 逐项验收后再标记完成。
+[实机测试记录](../../docs/STACKCHAN_HARDWARE_TEST_LOG.md)。本仓库固件需要
+Arduino-ESP32 core 3.x（`platformio.ini` 使用 pioarduino），Firmware CI 会编译
+`stackchan-k151` 与 `stackchan-selftest`；烧录到 K151 后仍需按
+[设备能力与上板清单](../../docs/STACKCHAN_DEVICE_PROFILE.md) 逐项验收。
 
 ## 文件
 

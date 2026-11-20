@@ -11,15 +11,16 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Protocol
 from urllib.parse import quote
 
 from pydantic import ValidationError
 
-from .device_contract import CommandView, DeviceEvent, PAYLOAD_MODELS
+from .device_contract import PAYLOAD_MODELS, CommandView, DeviceEvent
 
 WHITELIST = frozenset(PAYLOAD_MODELS)
 GUIDE_DURATION_SECONDS = 5 * 60
@@ -114,7 +115,7 @@ class DeviceRuntime:
                 response = self.client.post(
                     self._path("/events"), json=payload, headers=self._headers
                 )
-            except Exception as error:  # transport failures are retried
+            except Exception as error:  # noqa: BLE001 - transport failures are retried
                 last_error = error
             else:
                 if response.status_code < 400:
@@ -162,14 +163,14 @@ class DeviceRuntime:
         flushed = 0
         for entry in entries:
             try:
-                event = DeviceEvent.model_validate(entry)
+                DeviceEvent.model_validate(entry)
             except ValidationError:
                 continue
             try:
                 response = self.client.post(
                     self._path("/events"), json=entry, headers=self._headers
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - keep the event for the next replay
                 remaining.append(entry)
                 continue
             if response.status_code < 400:

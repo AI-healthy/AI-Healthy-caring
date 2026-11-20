@@ -37,7 +37,9 @@ uvicorn shiyi_api.main:app --reload --port 8000
 详见 [架构设计](docs/ARCHITECTURE.md)、[团队规范](docs/CONTRIBUTING.md)、[工作清单](docs/BACKLOG.md)。
 
 Stack-chan 实体交互与通信：[LAN-01 设备能力](docs/STACKCHAN_DEVICE_PROFILE.md)、
-[LAN-02 白名单协议](docs/LAN_DEVICE_PROTOCOL.md)、`bash scripts/demo_lan.sh`（LAN-03 演示）。
+[LAN-02 白名单协议](docs/LAN_DEVICE_PROTOCOL.md)、
+[官方固件本地 MCP 对接](docs/STACKCHAN_OFFICIAL_INTEGRATION.md)、
+`bash scripts/demo_lan.sh`（LAN-03 演示）。
 
 
 ## 联调

@@ -41,6 +41,8 @@ python -m shiyi_api.lan_demo               # 5 分钟伸展演示（无需 uvico
 - [STACKCHAN_DEVICE_PROFILE.md](STACKCHAN_DEVICE_PROFILE.md)：SKU、能力矩阵、舵机限幅、
   音频边界、上板 10 步清单
 - [LAN_DEVICE_PROTOCOL.md](LAN_DEVICE_PROTOCOL.md)：六类命令、状态机、幂等/过期/重试、时序
+- [STACKCHAN_OFFICIAL_INTEGRATION.md](STACKCHAN_OFFICIAL_INTEGRATION.md)：保留官方固件，
+  通过本地 MCP（HTTP :8788 / USB）接入的接口改造方案
 
 ### 2.3 固件
 

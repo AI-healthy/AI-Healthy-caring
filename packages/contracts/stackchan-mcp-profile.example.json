@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.1-draft",
+  "transport": {
+    "http_base_url": "http://192.168.1.50:8788",
+    "mcp_path": "/mcp",
+    "tools_path": "/tools",
+    "token": null,
+    "usb_port": "/dev/cu.usbmodem1101",
+    "usb_baud": 115200
+  },
+  "tools": {
+    "SET_EXPRESSION": [{"tool": "self.face.expression", "arguments": {"expression": "{preset}"}}],
+    "SPEAK_TEXT": [{"tool": "self.audio_speaker.play_text", "arguments": {"text": "{text}"}}],
+    "PLAY_GUIDE": [
+      {"tool": "self.face.expression", "arguments": {"expression": "thinking"}},
+      {"tool": "self.audio_speaker.play_text", "arguments": {"text": "{title}"}}
+    ],
+    "SHOW_TIMER": [
+      {"tool": "self.face.expression", "arguments": {"expression": "thinking"}},
+      {"tool": "self.audio_speaker.play_text", "arguments": {"text": "{label}"}}
+    ],
+    "MOVE_HEAD_PRESET": {
+      "nod": {"tool": "self.head.nod", "arguments": {}},
+      "shake": {"tool": "self.head.shake", "arguments": {}},
+      "tilt": {"tool": "self.head.tilt", "arguments": {}},
+      "look_around": {"tool": "self.head.move", "arguments": {"yaw": 0, "pitch": 45, "speed": 500}},
+      "greet": {"tool": "self.head.move", "arguments": {"yaw": 0, "pitch": 80, "speed": 500}}
+    },
+    "CANCEL_TASK": [
+      {"tool": "self.head.center", "arguments": {}},
+      {"tool": "self.face.expression", "arguments": {"expression": "idle"}}
+    ]
+  },
+  "notes": [
+    "Tool names depend on the community firmware patch; verify with GET /tools before use.",
+    "This profile is an example, not a hardware-verified contract.",
+    "Do not expose the MCP port to the public internet; add a token/mTLS in production."
+  ]
+}

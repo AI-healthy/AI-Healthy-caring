@@ -77,6 +77,11 @@ python -m shiyi_api.lan_demo               # 5 分钟伸展演示（无需 uvico
 | `70c84a7` | K151 固件骨架、NVS 恢复、进程内 LAN demo + CI |
 | `437cf02` | LAN-01 自检固件、触摸拒绝演示路径 |
 | `4dec7c2` | LAN 验收状态与真机阻塞记录 |
+| `a529938` | K151 实机记录（动作 / 语音唤醒 / 表情） |
 
 > 分支已推送到 GitHub：`origin/feat/lan-stackchan-control`（2026-11-19）。
 > 后续以 PR 形式请求 review；接口变更需与 xu 同步。
+>
+> 固件编译尝试：PlatformIO 6.2 + espressif32 6.13 工具链安装成功，但本机 Windows
+> SCons/GCC 组合在 `@response-file` 路径上存在兼容问题，源码尚未真正进入编译阶段。
+> 这是构建环境问题，不代表固件源码已通过或失败；换 Linux CI/另一台机器可继续验证。

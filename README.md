@@ -10,9 +10,9 @@
 
 - `apps/android/`：Kotlin + Jetpack Compose，今日／四时／探索／我的
 - `services/api/`：FastAPI、规则推荐、演示节气内容、持久化活动与反馈、设备模拟接口
-- `firmware/stackchan/`：固件接入边界，待确定硬件版本
-- `packages/contracts/`：跨端设备消息示例
-- `simulators/`：离线 Stack-chan 指令模拟器
+- `firmware/stackchan/`：K151 固件骨架（白名单/ACK/NVS 恢复），待编译与上板
+- `packages/contracts/`：跨端与六类设备白名单命令示例
+- `simulators/`：离线单命令校验与有状态设备运行时（ACK/触摸/离线补发）
 - `docs/`：系统架构、决策记录、协作规范
 - `.github/workflows/`：后端持续集成
 
@@ -35,6 +35,11 @@ uvicorn shiyi_api.main:app --reload --port 8000
 **重要**：本仓库不是医疗诊断、治疗、开方或心理疾病识别系统。演示数据标记 `is_demo`，不得误当真实健康记录。严禁上传个人健康原始数据、音频或云服务密钥。
 
 详见 [架构设计](docs/ARCHITECTURE.md)、[团队规范](docs/CONTRIBUTING.md)、[工作清单](docs/BACKLOG.md)。
+
+Stack-chan 实体交互与通信：[LAN-01 设备能力](docs/STACKCHAN_DEVICE_PROFILE.md)、
+[LAN-02 白名单协议](docs/LAN_DEVICE_PROTOCOL.md)、
+[官方固件本地 MCP 对接](docs/STACKCHAN_OFFICIAL_INTEGRATION.md)、
+`bash scripts/demo_lan.sh`（LAN-03 演示）。
 
 
 ## 联调

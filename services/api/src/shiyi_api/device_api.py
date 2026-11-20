@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 
 from . import identity_storage
 from .auth import bearer, current_user
-from .device_contract import CommandRequest, CommandView, DeviceEvent, Receipt
+from .device_contract import CommandRequest, CommandView, DeviceEvent, Receipt, build_command
 from .device_storage import enqueue, get_command, pending, record_event
 from .storage import SessionStore, StoreError, get_store
 
@@ -87,7 +87,12 @@ def invoke(operation, *args):
 @router.post("/commands", response_model=CommandView)
 def create_command(payload: CommandRequest, user: User, store: Store):
     check_owner(store, user, payload.device_id)
-    return invoke(enqueue, store, user, payload)
+    try:
+        command_type, command_payload = build_command(payload)
+    except ValueError:
+        # Do not echo payload contents back in the validation error.
+        raise HTTPException(422, "Invalid command payload") from None
+    return invoke(enqueue, store, user, payload, command_type, command_payload)
 
 
 @router.get("/commands/{command_id}", response_model=CommandView)

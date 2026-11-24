@@ -30,7 +30,7 @@ Gadgetbridge → Health Connect → 时宜 Android → 授权 HTTPS API。先用
 
 ## 后端受控上传
 
-默认 SHIYI_ENABLE_REAL_HEALTH=0，不接收真实数据。启用前需受试者明确同意、可信 TLS、访问控制和受保护存储/备份，不公开部署。仅在团队控制环境将环境变量设为 1。真实数据要求注册账号（非开发 token），health_connect 来源、真实策略 local-wearable-v1 和来源包名 data_origin。来源由客户端报告，不是服务端验证的硬件身份证明。
+默认 SHIYI_ENABLE_REAL_HEALTH=0，不接收真实数据。启用前需受试者明确同意、可信 TLS、访问控制和受保护存储/备份，不公开部署。仅在团队控制环境将环境变量设为 1。真实数据要求注册账号（非开发 token），health_connect 或 gadgetbridge 来源、真实策略 local-wearable-v1 和来源包名 data_origin。来源由客户端报告，不是服务端验证的硬件身份证明。
 
 App 中输入受控 HTTPS 服务 origin 和注册账号的 access token（不持久化），点击「授权服务器采集预览指标」后再点击「上传预览记录」。每批最多 100 条；失败可重试，先前成功批次保留。可撤回本地和服务器权限，历史通过现有 DELETE 接口清除。后端未启用时会拒绝上传。本地 HTTP 不发送真实健康数据。Harness 暂不自动消费真实记录。
 
@@ -39,3 +39,5 @@ App 中输入受控 HTTPS 服务 origin 和注册账号的 access token（不持
 ## 单 APK 后续迁移
 
 Gadgetbridge 是完整 AGPL-3.0 Android 应用，不是 Maven SDK。以官方稳定源码为基座，保留 HuaweiLESupport、HuaweiSupportProvider、HuaweiSyncState、HuaweiCrypto、HuaweiPacket、HuaweiTLV、FitnessData、HuaweiSampleProvider、设备与数据库服务。先跑通原版，再将时宜 Compose 页面和 WearableReader 适配器移入同一应用工程；以同步完成事件查询 HuaweiActivitySample 并转换为观测。保留许可与作者声明、开放衍生应用对应源码；核对 AGPL 义务后再分发。无需继续自研 Python 认证协议。
+
+单 APK 实验构建见 [GADGETBRIDGE_EMBEDDED.md](GADGETBRIDGE_EMBEDDED.md)。

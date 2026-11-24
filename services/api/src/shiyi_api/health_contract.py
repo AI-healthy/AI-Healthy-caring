@@ -2,12 +2,21 @@
 from datetime import UTC, timedelta
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    model_validator,
+)
 
-Source = Literal["demo", "self_report", "health_connect", "vendor_sdk"]
+Source = Literal["demo", "self_report", "health_connect", "vendor_sdk", "gadgetbridge"]
 Metric = Literal["sleep_minutes", "steps", "energy_level", "resting_heart_rate_bpm", "heart_rate_bpm"]
 REAL_METRICS = frozenset({"sleep_minutes", "steps", "heart_rate_bpm", "resting_heart_rate_bpm"})
 REAL_POLICY = "local-wearable-v1"
+REAL_SOURCES = frozenset({"health_connect", "gadgetbridge"})
 RANGES = {
     "sleep_minutes": (0, 1440),
     "steps": (0, 200000),
@@ -46,7 +55,7 @@ class ObservationInput(BaseModel):
     @model_validator(mode="after")
     def check_sample(self):
         if not self.is_demo:
-            if self.source != "health_connect" or self.metric not in REAL_METRICS:
+            if self.source not in REAL_SOURCES or self.metric not in REAL_METRICS:
                 raise ValueError("Unsupported real observation source or metric")
             if not self.data_origin or not self.data_origin.strip():
                 raise ValueError("Real observations require their originating app package")

@@ -40,9 +40,10 @@ class HealthApiClient(baseUrl: String, private val token: String) {
             }
         }
 
-    suspend fun consent(metrics: Set<HealthMetric>, granted: Boolean) {
+    suspend fun consent(metrics: Set<HealthMetric>, granted: Boolean, source: String = "health_connect") {
+        require(source in setOf("health_connect", "gadgetbridge"))
         for (metric in metrics) {
-            request("PUT", "/api/v1/health/consents/health_connect/" + metric.wire,
+            request("PUT", "/api/v1/health/consents/" + source + "/" + metric.wire,
                 JSONObject().put("granted", granted).put("policy_version", "local-wearable-v1"))
         }
     }

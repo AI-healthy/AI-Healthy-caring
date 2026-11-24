@@ -6,7 +6,7 @@ from datetime import timedelta
 from uuid import uuid4
 
 from . import storage
-from .health_contract import REAL_METRICS, REAL_POLICY
+from .health_contract import REAL_METRICS, REAL_POLICY, REAL_SOURCES
 from .storage import StoreError
 
 SCHEMA = """
@@ -58,7 +58,7 @@ def real_ingestion_enabled():
 
 def update_consent(store, user, source, metric, payload):
     if payload.policy_version == REAL_POLICY:
-        if source != "health_connect" or metric not in REAL_METRICS:
+        if source not in REAL_SOURCES or metric not in REAL_METRICS:
             raise StoreError(422, "Unsupported real consent source or metric")
         if payload.granted and (not real_ingestion_enabled() or not user.startswith("usr_")):
             raise StoreError(403, "Real collection is disabled or requires a registered account")

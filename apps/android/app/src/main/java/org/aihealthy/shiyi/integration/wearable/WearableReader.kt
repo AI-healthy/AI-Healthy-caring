@@ -16,11 +16,12 @@ data class HealthObservation(
     val value: Int,
     val observedAt: Instant,
     val origin: String,
-    val intervalStart: Instant? = null
+    val intervalStart: Instant? = null,
+    val source: String = "health_connect"
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("client_sample_id", id)
-        .put("source", "health_connect")
+        .put("source", source)
         .put("metric", metric.wire)
         .put("value", value)
         .put("observed_at", observedAt.toString())

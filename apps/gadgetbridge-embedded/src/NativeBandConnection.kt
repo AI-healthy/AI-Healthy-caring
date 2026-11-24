@@ -66,7 +66,7 @@ class NativeBandConnection(private val context: Context) {
         device.isConnecting || device.isInitializing, device.isBusy)
 
     private fun honorName(name: String?): Boolean = name != null &&
-        Regex("^honor[\\\\s_-]*band[\\\\s_-]*4(?:$|[\\\\s_-].*)",
+        Regex("""^honor[\s_-]*band[\s_-]*4(?:$|[\s_-].*)""",
             RegexOption.IGNORE_CASE).matches(name.trim())
 
     private fun foundDevice(bt: BluetoothDevice, name: String, rssi: Int,

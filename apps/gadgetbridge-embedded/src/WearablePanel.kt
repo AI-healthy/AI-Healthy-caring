@@ -44,6 +44,10 @@ fun WearablePanel() {
     var bands by remember { mutableStateOf<List<GBDevice>>(emptyList()) }
     var scanJob by remember { mutableStateOf<Job?>(null) }
     var scanning by remember { mutableStateOf(false) }
+    val seen = remember { mutableStateMapOf<String, Boolean>() }
+    var scanError by remember { mutableStateOf("") }
+    var manualAddress by remember { mutableStateOf("") }
+    var showManual by remember { mutableStateOf(false) }
     var pendingAddress by remember { mutableStateOf<String?>(null) }
     var chosenAddress by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf("开启蓝牙，搜索并选择附近的荣耀手环 4。") }
@@ -81,6 +85,12 @@ fun WearablePanel() {
         refreshDevices()
         status = if (connection.hasPermissions()) "蓝牙权限已授权，可以搜索设备。"
                  else "需要附近设备权限；旧版 Android 需要定位权限才能扫描。"
+    }
+    val locationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        status = if (connection.hasLocationPermission()) "扫描兼容权限已授权，请再次搜索。"
+                 else "未授权定位兼容权限，可尝试直接输入手环蓝牙地址。"
     }
     val enableLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -125,21 +135,35 @@ fun WearablePanel() {
             enableLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
             return
         }
+        if (android.os.Build.VERSION.SDK_INT < 31 && !connection.locationEnabled()) {
+            status = "旧版 Android 需要打开系统定位开关才能扫描蓝牙设备。"
+            return
+        }
         found.clear()
+        seen.clear()
+        scanError = ""
         refreshDevices()
+        runCatching { connection.bonded() }.getOrDefault(emptyList()).forEach {
+            found[it.address] = it
+        }
         scanning = true
         status = "正在搜索附近的荣耀手环 4…"
         scanJob = scope.launch {
             try {
-                withTimeoutOrNull(12000L) {
-                    connection.scan().collect { band -> found[band.address] = band }
+                withTimeoutOrNull(25000L) {
+                    connection.scan().collect { event ->
+                        seen[event.address] = true
+                        event.match?.let { found[it.address] = it }
+                    }
                 }
                 status = if (found.isEmpty() && bands.isEmpty())
-                    "没有找到手环。请靠近手机，断开其他手机或电脑的蓝牙连接后重试。"
+                    if (seen.isEmpty()) "未收到任何 BLE 广播，请检查系统权限、定位开关与蓝牙状态。"
+                    else "收到附近设备广播，但未匹配到荣耀手环 4。请断开其他连接或手动输入地址。"
                     else "请选择要连接的手环。"
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                scanError = e.message.orEmpty()
                 status = "扫描失败，请检查蓝牙和系统权限。"
             } finally {
                 scanning = false
@@ -186,6 +210,38 @@ fun WearablePanel() {
                     Text("搜索附近手环")
                 }
             }
+            Text("本次扫描：附近设备 " + seen.size + " 个，匹配手环 " + found.size + " 个",
+                style = MaterialTheme.typography.bodySmall)
+            if (scanError.isNotBlank()) Text("扫描错误：" + scanError)
+            if (!scanning && !busy && android.os.Build.VERSION.SDK_INT >= 31 &&
+                !connection.hasLocationPermission()) {
+                OutlinedButton(onClick = { locationLauncher.launch(connection.locationPermissions()) }) {
+                    Text("启用扫描兼容权限（仅用于设备发现）")
+                }
+            }
+            if (!scanning && !busy) {
+                OutlinedButton(onClick = { showManual = !showManual }) {
+                    Text(if (showManual) "收起手动连接" else "找不到设备？手动输入蓝牙地址")
+                }
+                if (showManual) {
+                    Text("仅输入自己的荣耀手环 4 的蓝牙 MAC 地址。手动添加后再点击连接。")
+                    OutlinedTextField(value = manualAddress, onValueChange = { manualAddress = it },
+                        label = { Text("蓝牙 MAC 地址") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth())
+                    Button(enabled = manualAddress.isNotBlank(), onClick = {
+                        if (!connection.hasPermissions()) permissionLauncher.launch(connection.permissions())
+                        else {
+                            try {
+                                val band = connection.manual(manualAddress)
+                                found[band.address] = band
+                                status = "已添加待连接设备，请点击连接手环。"
+                            } catch (_: Exception) {
+                                status = "无法添加，请检查地址格式、设备类型和蓝牙状态。"
+                            }
+                        }
+                    }) { Text("添加手环") }
+                }
+            }
             val addresses = (bands.map { it.address } + found.keys + listOfNotNull(pendingAddress)).distinct()
             if (addresses.isEmpty()) Text("尚未发现设备。")
             for (address in addresses) {
@@ -202,7 +258,7 @@ fun WearablePanel() {
                             state?.connecting == true || pendingAddress == address -> "连接认证中"
                             known != null -> "已配对 · 未连接"
                             else -> "附近设备"
-                        } + (candidate?.let { " · 信号 " + it.rssi + " dBm" } ?: ""))
+                        } + (candidate?.takeIf { it.rssi != -1 }?.let { " · 信号 " + it.rssi + " dBm" } ?: ""))
                         if (device != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (state?.ready == true) {

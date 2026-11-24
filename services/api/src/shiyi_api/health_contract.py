@@ -1,5 +1,5 @@
 """Typed observation contracts for Android integration."""
-from datetime import UTC, timedelta
+from datetime import UTC, date, timedelta
 from typing import Literal
 
 from pydantic import (
@@ -51,6 +51,7 @@ class ObservationInput(BaseModel):
     missing_reason: Literal["not_available", "not_worn", "sensor_error", "not_reported"] | None = None
     is_demo: StrictBool
     data_origin: str | None = Field(default=None, min_length=1, max_length=200)
+    device_scope: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
 
     @model_validator(mode="after")
     def check_sample(self):
@@ -59,7 +60,7 @@ class ObservationInput(BaseModel):
                 raise ValueError("Unsupported real observation source or metric")
             if not self.data_origin or not self.data_origin.strip():
                 raise ValueError("Real observations require their originating app package")
-        elif self.data_origin is not None:
+        elif self.data_origin is not None or self.device_scope is not None:
             raise ValueError("Demo records must not claim a real origin")
         self.observed_at = self.observed_at.astimezone(UTC)
         if self.interval_start is not None:
@@ -112,3 +113,25 @@ class BatchReceipt(BaseModel):
 class ObservationPage(BaseModel):
     items: list[ObservationView]
     next_offset: int | None
+
+
+class WearableStream(BaseModel):
+    source: Literal["gadgetbridge", "health_connect"]
+    data_origin: str
+    device_scope: str
+    metrics: list[Metric]
+
+
+class WearableSummary(BaseModel):
+    stream: WearableStream
+    date: date
+    timezone: str
+    as_of: AwareDatetime
+    steps: int | None
+    sleep_minutes: int | None
+    heart_rate_bpm: int | None
+    heart_rate_at: AwareDatetime | None
+    resting_heart_rate_bpm: int | None
+    resting_heart_rate_at: AwareDatetime | None
+    sample_counts: dict[str, int]
+    issues: list[str]

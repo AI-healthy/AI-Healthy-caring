@@ -257,3 +257,54 @@ def test_embedded_gadgetbridge_source(client, monkeypatch):
     )
     assert response.status_code == 200
     assert upload(client, auth, payload).status_code == 200
+
+
+def test_wearable_stream_summary_and_revocation(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    for metric in ("steps", "sleep_minutes", "heart_rate_bpm"):
+        assert real_consent(client, auth, metric).status_code == 200
+    scope = "a" * 32
+    common = {"is_demo": False, "data_origin": "test.app", "device_scope": scope}
+    rows = [
+        sample(**common),
+        sample(**{**common, "client_sample_id": "other-device", "device_scope": "b" * 32}),
+        sample(**{**common, "client_sample_id": "old", "device_scope": None}),
+        sample(**{**common, "client_sample_id": "sleep1", "metric": "sleep_minutes",
+                  "value": 120, "observed_at": (NOW - timedelta(hours=8)).isoformat(),
+                  "interval_start": (NOW - timedelta(hours=10)).isoformat()}),
+        sample(**{**common, "client_sample_id": "sleep2", "metric": "sleep_minutes",
+                  "value": 120, "observed_at": (NOW - timedelta(hours=7)).isoformat(),
+                  "interval_start": (NOW - timedelta(hours=9)).isoformat()}),
+        sample(**{**common, "client_sample_id": "hr1", "metric": "heart_rate_bpm",
+                  "value": 72, "interval_start": None}),
+    ]
+    assert upload(client, auth, *rows).status_code == 200
+    params = {"source": "health_connect", "data_origin": "test.app", "device_scope": scope}
+    endpoint = HEALTH + "/summary"
+    result = client.get(endpoint, headers=auth, params=params)
+    assert result.status_code == 200, result.text
+    data = result.json()
+    assert data["steps"] == 1200
+    assert data["sleep_minutes"] == 180
+    assert data["heart_rate_bpm"] == 72
+    assert len(client.get(HEALTH + "/streams", headers=auth).json()) == 2
+    assert client.get(endpoint, headers=other, params=params).status_code == 404
+    assert real_consent(client, auth, "steps", granted=False).status_code == 200
+    assert client.get(endpoint, headers=auth, params=params).json()["steps"] is None
+    assert client.get(endpoint, headers=auth, params={**params, "timezone": "invalid"}).status_code == 422
+
+
+def test_stream_scope_backfill_idempotency(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    assert real_consent(client, auth).status_code == 200
+    original = hr()
+    assert upload(client, auth, original).status_code == 200
+    scoped = {**original, "device_scope": "a" * 32}
+    assert upload(client, auth, scoped).json()["items"][0]["duplicate"]
+    assert upload(client, auth, original).json()["items"][0]["duplicate"]
+    assert upload(client, auth, {**scoped, "device_scope": "b" * 32}).status_code == 409
+    assert len(client.get(HEALTH + "/observations", headers=auth).json()["items"]) == 1
+    assert client.get(HEALTH + "/streams", headers=auth).json()[0]["device_scope"] == "a" * 32

@@ -1,8 +1,9 @@
-from typing import Annotated
+from datetime import date
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from . import health_storage
+from . import health_storage, health_summary
 from .auth import current_user
 from .health_contract import (
     BatchReceipt,
@@ -12,6 +13,8 @@ from .health_contract import (
     ObservationBatch,
     ObservationPage,
     Source,
+    WearableStream,
+    WearableSummary,
 )
 from .storage import SessionStore, StoreError, get_store
 
@@ -54,3 +57,21 @@ def history(
 @router.delete("/observations/{observation_id}", status_code=204)
 def delete_observation(observation_id: str, user: User, store: Store):
     call(health_storage.delete_observation, store, user, observation_id)
+
+
+@router.get("/streams", response_model=list[WearableStream])
+def wearable_streams(user: User, store: Store):
+    return call(health_summary.streams, store, user)
+
+
+@router.get("/summary", response_model=WearableSummary)
+def wearable_summary(
+    user: User, store: Store, source: Literal["gadgetbridge", "health_connect"],
+    data_origin: Annotated[str, Query(min_length=1, max_length=200)],
+    device_scope: Annotated[str, Query(pattern=r"^[0-9a-f]{32}$")],
+    timezone: Annotated[str, Query(min_length=1, max_length=64)] = "Asia/Shanghai",
+    day: date | None = None,
+):
+    return call(
+        health_summary.daily, store, user, source, data_origin, device_scope, timezone, day
+    )

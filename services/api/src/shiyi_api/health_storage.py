@@ -113,14 +113,27 @@ def upload(store, user, batch):
             if not item.is_demo and consent["policy_version"] != REAL_POLICY:
                 raise StoreError(403, "Explicit real-data consent required")
             # Keep the existing synthetic JSON representation byte-for-byte for retries.
-            encoded = item.model_dump_json(exclude={"data_origin"} if item.is_demo else None)
+            excluded = {"data_origin", "device_scope"} if item.is_demo else set()
+            if item.device_scope is None:
+                excluded.add("device_scope")
+            encoded = item.model_dump_json(exclude=excluded)
             prior = db.execute(
                 """SELECT observation_id,payload_json FROM health_observations
                    WHERE user_id=? AND source=? AND metric=? AND client_sample_id=?""",
                 (user, item.source, item.metric, item.client_sample_id),
             ).fetchone()
             if prior and prior["payload_json"] != encoded:
-                raise StoreError(409, "Sample identifier reused with different data")
+                old, new = json.loads(prior["payload_json"]), json.loads(encoded)
+                old_scope, new_scope = old.pop("device_scope", None), new.pop("device_scope", None)
+                if old != new or (old_scope and new_scope and old_scope != new_scope):
+                    raise StoreError(409, "Sample identifier reused with different data")
+                # A verified repeat of an old unscoped sample can add its stream identity.
+                # Never replace an existing scope or erase it on an old-client retry.
+                if old_scope is None and new_scope is not None:
+                    db.execute(
+                        "UPDATE health_observations SET payload_json=? WHERE observation_id=?",
+                        (encoded, prior["observation_id"]),
+                    )
             observation_id = prior["observation_id"] if prior else str(uuid4())
             if prior is None:
                 db.execute(

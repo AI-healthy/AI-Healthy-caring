@@ -3,7 +3,13 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from . import health_state_service, health_storage, health_summary, pressure_model_service, pressure_storage
+from . import (
+    health_state_service,
+    health_storage,
+    health_summary,
+    pressure_model_service,
+    pressure_storage,
+)
 from .auth import current_user
 from .health_contract import (
     BatchReceipt,

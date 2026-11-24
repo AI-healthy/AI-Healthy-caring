@@ -138,12 +138,12 @@ def evaluate(pairs, now, total_checkins=None):
         reasons.append("limited_training_label_variation")
     if test and not {p.checkin.context for p in test} <= {p.checkin.context for p in train}:
         reasons.append("unseen_test_context")
-    result = dict(
-        as_of=now, total_checkins=len(pairs) if total_checkins is None else total_checkins,
-        eligible_pairs=len(eligible), independent_pairs=len(independent),
-        train_count=len(train), test_count=len(test), train_days=train_days,
-        test_days=test_days, split_at=split_at, reasons=reasons,
-    )
+    result = {
+        "as_of": now, "total_checkins": len(pairs) if total_checkins is None else total_checkins,
+        "eligible_pairs": len(eligible), "independent_pairs": len(independent),
+        "train_count": len(train), "test_count": len(test), "train_days": train_days,
+        "test_days": test_days, "split_at": split_at, "reasons": reasons,
+    }
     if reasons:
         return PressureEvaluation(status="insufficient_data", metrics=[], **result)
     train_y = [p.checkin.perceived_stress for p in train]

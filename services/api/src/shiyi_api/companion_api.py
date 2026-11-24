@@ -1,4 +1,4 @@
-"""StackChan text chat with a self-hosted OpenAI-compatible model."""
+"""StackChan text chat with Moark or a local OpenAI-compatible model."""
 import json
 import os
 from typing import Annotated, Literal
@@ -51,7 +51,11 @@ class ChatReply(BaseModel):
     reaction: Literal["nod", "cheer", "calm"]
 
 
-def _model_config() -> tuple[str, str]:
+def _model_config() -> tuple[str, str, str | None]:
+    moark_key = os.environ.get("SHIYI_COMPANION_MOARK_API_KEY", "").strip()
+    if moark_key:
+        return "https://api.moark.com/v1/chat/completions", "ds-flash", moark_key
+
     model = os.environ.get("SHIYI_COMPANION_MODEL", "").strip()
     address = os.environ.get(
         "SHIYI_COMPANION_MODEL_URL", "http://127.0.0.1:11434/v1/chat/completions"
@@ -67,10 +71,12 @@ def _model_config() -> tuple[str, str]:
             raise ValueError
     except ValueError:
         raise HTTPException(503, "Companion model is not configured") from None
-    return address, model
+    return address, model, None
 
 
-async def _complete_chat(payload: ChatRequest, address: str, model: str) -> ChatReply:
+async def _complete_chat(
+    payload: ChatRequest, address: str, model: str, api_key: str | None
+) -> ChatReply:
     body = {
         "model": model,
         "messages": [
@@ -80,11 +86,15 @@ async def _complete_chat(payload: ChatRequest, address: str, model: str) -> Chat
         "temperature": 0.6,
         "stream": False,
         "max_tokens": 1024,
-        "response_format": {"type": "json_object"},
     }
+    headers = {}
+    if api_key is None:
+        body["response_format"] = {"type": "json_object"}
+    else:
+        headers["Authorization"] = f"Bearer {api_key}"
     async with (
         httpx.AsyncClient(timeout=25, trust_env=False, follow_redirects=False) as client,
-        client.stream("POST", address, json=body) as response,
+        client.stream("POST", address, json=body, headers=headers) as response,
     ):
         response.raise_for_status()
         content = bytearray()
@@ -93,7 +103,12 @@ async def _complete_chat(payload: ChatRequest, address: str, model: str) -> Chat
             if len(content) > 65536:
                 raise ValueError("Model response exceeds size limit")
     result = json.loads(content)
-    return ChatReply.model_validate_json(result["choices"][0]["message"]["content"])
+    reply = result["choices"][0]["message"]["content"]
+    if isinstance(reply, str) and reply.strip().startswith("```"):
+        lines = reply.strip().splitlines()
+        if len(lines) >= 3 and lines[-1] == "```":
+            reply = "\n".join(lines[1:-1])
+    return ChatReply.model_validate_json(reply)
 
 
 @router.post(
@@ -104,14 +119,14 @@ async def _complete_chat(payload: ChatRequest, address: str, model: str) -> Chat
                503: {"description": "Model disabled"}, 504: {"description": "Model timed out"}},
 )
 async def chat(payload: ChatRequest, _user: Annotated[str, Depends(current_user)]) -> ChatReply:
-    address, model = _model_config()
+    address, model, api_key = _model_config()
     try:
         _capacity.acquire_nowait()
     except anyio.WouldBlock:
         raise HTTPException(429, "Companion is busy", headers={"Retry-After": "2"}) from None
     try:
         with anyio.fail_after(35):
-            return await _complete_chat(payload, address, model)
+            return await _complete_chat(payload, address, model, api_key)
     except (TimeoutError, httpx.TimeoutException):
         raise HTTPException(504, "Companion model timed out") from None
     except (httpx.HTTPError, ValueError, TypeError, KeyError, IndexError):

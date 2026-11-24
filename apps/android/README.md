@@ -17,9 +17,10 @@ Android Studio 打开 `apps/android`。首页活动与 Stack-chan 仍为静态�
 角色根据 Stack-chan 的屏幕、三键和桌面底座绘制。形象参考
 [Stack-chan 官方项目](https://github.com/stack-chan/stack-chan)。
 
-在运行时宜 API 的机器上启动 Ollama，在 API 的启动环境中设置
-`SHIYI_COMPANION_MODEL` 为 `ollama list` 中的模型名，例如 `qwen3.6:35b-a3b`。
-默认连接同机的 `http://127.0.0.1:11434/v1/chat/completions`。
+在时宜 API 的启动环境中设置 `SHIYI_COMPANION_MOARK_API_KEY`，并重启 API。
+设置后，时宜后端向 Moark 的 `https://api.moark.com/v1/chat/completions` 请求
+`ds-flash`，请求会携带本轮和最近四轮聊天文字。请使用部署环境的密钥配置。
+如需使用本机 Ollama，可清除上述变量并设置 `SHIYI_COMPANION_MODEL`。
 手机的「对话设置」填可达的时宜 API HTTPS 地址和已有的时宜登录令牌，
 与穿戴接口使用同一身份验证。开发联调也可使用 `SHIYI_DEV_USERS` 配置的测试令牌。
 

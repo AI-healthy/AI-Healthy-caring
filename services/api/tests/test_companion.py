@@ -19,6 +19,7 @@ MESSAGES = [
 def client(monkeypatch):
     monkeypatch.setenv("SHIYI_DEV_USERS", '{"demo":"demo-companion-token"}')
     monkeypatch.delenv("SHIYI_COMPANION_MODEL", raising=False)
+    monkeypatch.delenv("SHIYI_COMPANION_MOARK_API_KEY", raising=False)
     with TestClient(app) as client:
         yield client
 
@@ -78,3 +79,29 @@ def test_chat_forwards_only_text_and_allows_known_reactions(monkeypatch, client)
         finally:
             server.shutdown()
             thread.join()
+
+
+def test_moark_uses_fixed_endpoint_and_server_credential(monkeypatch, client):
+    import httpx
+
+    from shiyi_api import companion_api
+
+    real_client = httpx.AsyncClient
+
+    def provider(request):
+        assert str(request.url) == "https://api.moark.com/v1/chat/completions"
+        assert request.headers["Authorization"] == "Bearer test-provider-key"
+        body = json.loads(request.content)
+        assert body["model"] == "ds-flash"
+        assert body["messages"][1:] == MESSAGES
+        return httpx.Response(200, json={"choices": [{"message": {
+            "content": '```json\n{"reply":"我在。","reaction":"calm"}\n```',
+        }}]})
+
+    monkeypatch.setenv("SHIYI_COMPANION_MOARK_API_KEY", "test-provider-key")
+    monkeypatch.setattr(companion_api.httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(provider), **kwargs
+    ))
+    response = client.post("/api/v1/companion/chat", headers=AUTH, json={"messages": MESSAGES})
+    assert response.status_code == 200
+    assert response.json() == {"reply": "我在。", "reaction": "calm"}

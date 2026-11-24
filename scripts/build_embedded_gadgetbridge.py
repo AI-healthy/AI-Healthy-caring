@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 UPSTREAM = "https://github.com/Freeyourgadget/Gadgetbridge.git"
 PIN = "a0948ee1cbc2a870f91d313f8e37df5f524465f7"
 PACKAGE = Path("org/aihealthy/shiyi")
+DAO_UPSTREAM = "https://github.com/Freeyourgadget/greenDAO.git"
+DAO_PIN = "1998d7cd2d21f662c6044f6ccf3b3a251bbad341"
 
 
 def run(*args, cwd=None):
@@ -34,6 +36,24 @@ def prepare(dest):
         raise RuntimeError("Unexpected upstream commit")
     run("git", "submodule", "update", "--init", "--recursive", cwd=dest)
 
+    # The historical JitPack artifact is no longer available. Compile exactly
+    # the same generator sources and templates, not a different ORM version.
+    dao = dest / "third_party/greendao"
+    dao.mkdir(parents=True)
+    run("git", "init", str(dao))
+    run("git", "fetch", "--depth=1", DAO_UPSTREAM, DAO_PIN, cwd=dao)
+    run("git", "checkout", "--detach", "FETCH_HEAD", cwd=dao)
+    if subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=dao, text=True).strip() != DAO_PIN:
+        raise RuntimeError("Unexpected greenDAO commit")
+    generator = dest / "GBDaoGenerator/build.gradle"
+    replace_once(generator,
+                 "implementation 'com.github.Freeyourgadget:greendao:1998d7cd2d21f662c6044f6ccf3b3a251bbad341'",
+                 "implementation 'org.freemarker:freemarker:2.3.23'")
+    replace_once(generator, "srcDir 'src'",
+                 "srcDir 'src'\n            srcDir '../third_party/greendao/DaoGenerator/src'")
+    with generator.open("a", encoding="utf-8") as f:
+        f.write("\nsourceSets.main.resources.srcDir '../third_party/greendao/DaoGenerator/src-template'\n")
+
     project = dest / "build.gradle"
     replace_once(project, "classpath 'com.android.tools.build:gradle:8.6.1'",
                  "classpath 'com.android.tools.build:gradle:8.6.1'\n"
@@ -58,7 +78,9 @@ def prepare(dest):
                  "    implementation 'androidx.compose.foundation:foundation'\n"
                  "    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'")
     with gradle.open("a", encoding="utf-8") as f:
-        f.write("\nandroid { kotlinOptions { jvmTarget = '1.8' } }\n")
+        f.write("\nandroid { kotlinOptions { jvmTarget = '1.8' } }\n"
+                "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {\n"
+                "    dependsOn(\":GBDaoGenerator:genSources\")\n}\n")
 
     manifest = dest / "app/src/main/AndroidManifest.xml"
     replace_once(manifest, "    <!-- Used for Bluetooth access -->",

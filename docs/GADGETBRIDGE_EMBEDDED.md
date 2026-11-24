@@ -38,3 +38,7 @@ Gadgetbridge 为 AGPL-3.0-or-later。保留 upstream LICENSE 和版权声明；�
 ## 验收
 
 CI 编译成功只是工程验证；必须以真实 Honor Band 4 完成配对、同步、非空健康记录、重启后重新连接，才算硬件接入成功。
+
+## 可复现数据库生成器
+
+旧版 JitPack 的定制 greenDAO 工件不可解析时，构建脚本直接获取原项目固定提交 `1998d7cd2d21f662c6044f6ccf3b3a251bbad341` 的生成器 Java 源码和 FreeMarker 模板，并以现有 Gradle 编译，保持数据库 schema 生成行为。对应源码与许可证保留于 `third_party/greendao`，一并归档。

@@ -1,6 +1,7 @@
 package org.aihealthy.shiyi
 
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import org.aihealthy.shiyi.companion.CompanionSession
 import org.aihealthy.shiyi.companion.StackChanCompanion
 import org.aihealthy.shiyi.integration.healthconnect.WearablePanel
@@ -34,12 +35,18 @@ private fun ShiYiApp() {
     var tab by remember { mutableIntStateOf(0) }
     var message by remember { mutableStateOf("今天也可以从一件小事开始。") }
     val companion = remember { CompanionSession() }
-    val tabs = listOf("今日", "四时", "探索", "我的", "陪伴")
+    val tabs = listOf("首页", "四时", "计划", "我的", "陪伴", "健康")
     MaterialTheme(colorScheme = lightColorScheme(primary = Moss, background = Paper)) {
+        if (tab == 0) {
+            ShiYiHome(onSeasons = { tab = 1 }, onHealth = { tab = 5 }, onPlan = { tab = 2 },
+                onChat = { tab = 4 }, onProfile = { tab = 3 })
+            return@MaterialTheme
+        }
+        BackHandler { tab = 0 }
         Scaffold(
             bottomBar = {
                 NavigationBar(containerColor = Paper) {
-                    tabs.forEachIndexed { index, title ->
+                    tabs.take(5).forEachIndexed { index, title ->
                         NavigationBarItem(
                             selected = tab == index,
                             onClick = { tab = index },
@@ -60,7 +67,7 @@ private fun ShiYiApp() {
                 item { Text("时宜", fontSize = 34.sp, color = Ink, fontWeight = FontWeight.Bold) }
                 item { Text(tabs[tab] + " · 生活在当下", color = Moss, fontSize = 14.sp) }
                 when (tab) {
-                    0 -> {
+                    2 -> {
                         item { SeasonCard("立冬 · 演示主题", "让节气成为一次探索生活的邀请。") }
                         item { Text("一件刚刚好的小事", fontSize = 22.sp, color = Ink) }
                         item { Text(message, color = Ink) }
@@ -77,7 +84,7 @@ private fun ShiYiApp() {
                         item { Text("活动与机器人为演示；穿戴数据请在「我的」读取。", color = Moss, fontSize = 12.sp) }
                     }
                     1 -> item { SeasonCard("四时", "节气、地域与饮食文化小卡片，等待审核内容接入。") }
-                    2 -> item { SeasonCard("探索", "散步、传统运动、食养与声音，找到自己的喜欢。") }
+                    5 -> item { WearablePanel() }
                     else -> {
                         item { SeasonCard("我的", "管理个人健康数据与授权。") }
                         item { WearablePanel() }

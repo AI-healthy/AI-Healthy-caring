@@ -115,6 +115,11 @@ def prepare(dest):
     icon_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(icon_source, icon_target)
 
+    wallpaper = Path("res/drawable-nodpi/shiyi_home_landscape.webp")
+    wallpaper_target = dest / "app/src/main" / wallpaper
+    wallpaper_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "apps/android/app/src/main" / wallpaper, wallpaper_target)
+
     # Android advertisements can contain a name before BluetoothDevice caches it.
     candidate = dest / "app/src/main/java/nodomain/freeyourgadget/gadgetbridge/impl/GBDeviceCandidate.java"
     replace_once(candidate, "    public boolean isNameKnown() {",
@@ -125,7 +130,7 @@ def prepare(dest):
 
     source = ROOT / "apps/android/app/src/main/java" / PACKAGE
     target = dest / "app/src/main/java" / PACKAGE
-    for name in ("MainActivity.kt", "integration/wearable/WearableReader.kt",
+    for name in ("MainActivity.kt", "ShiYiHome.kt", "integration/wearable/WearableReader.kt",
                  "core/network/HealthApiClient.kt"):
         out = target / name
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -141,9 +146,13 @@ def prepare(dest):
     replace_once(target / "MainActivity.kt", "setContent { ShiYiApp() }",
                  "setContent { HealthDashboardHost(this) { ShiYiApp() } }")
     replace_once(target / "MainActivity.kt",
-                 'item { Text("活动与机器人为演示；穿戴数据请在「我的」读取。", color = Moss, fontSize = 12.sp) }',
-                 'item { HealthOverviewCard(onManage = { tab = 3 }) }\n'
-                 '                        item { Text("活动与机器人为演示。", color = Moss, fontSize = 12.sp) }')
+                 '5 -> item { WearablePanel() }',
+                 '5 -> {\n'
+                 '                        item { HealthOverviewCard(onManage = { tab = 3 }) }\n'
+                 '                        item { WearablePanel() }\n'
+                 '                    }')
+    replace_once(target / "ShiYiHome.kt", "import java.time.LocalDate",
+                 "import java.time.LocalDate\nimport nodomain.freeyourgadget.gadgetbridge.R")
     shutil.copytree(source / "companion", target / "companion")
     shutil.copytree(ROOT / "apps/gadgetbridge-embedded/src", target / "integration/embedded")
     test_target = dest / "app/src/test/java" / PACKAGE / "integration/embedded"

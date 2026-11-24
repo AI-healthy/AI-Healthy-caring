@@ -64,7 +64,8 @@ def prepare(dest):
     replace_once(manifest, "    <!-- Used for Bluetooth access -->",
                  '    <uses-permission android:name="android.permission.INTERNET" />\n'
                  "    <!-- Used for Bluetooth access -->")
-    replace_once(manifest, 'android:label="@string/app_name"', 'android:label="时宜"')
+    replace_once(manifest, 'android:label="@string/app_name"\n        android:roundIcon',
+                 'android:label="时宜"\n        android:roundIcon')
     replace_once(manifest, 'android:allowBackup="false"',
                  'android:allowBackup="false" android:usesCleartextTraffic="false"')
     replace_once(manifest, '                <category android:name="android.intent.category.LAUNCHER" />',

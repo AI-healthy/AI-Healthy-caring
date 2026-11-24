@@ -172,3 +172,271 @@ def test_registered_account_simulator_binding(client):
     assert client.get(f"{root}/{did}/pending", headers=device_auth).status_code == 401
     assert client.get(root + "/commands/" + cid, headers=auth).json()["status"] == "CANCELLED"
     assert client.post(root + "/commands", headers=auth, json=payload).status_code == 404
+
+
+POLICY = "local-wearable-v1"
+
+
+def real_consent(client, auth, metric="heart_rate_bpm", granted=True):
+    return client.put(
+        f"{HEALTH}/consents/health_connect/{metric}", headers=auth,
+        json={"granted": granted, "policy_version": POLICY},
+    )
+
+
+def hr(**changes):
+    return sample(
+        client_sample_id="hc-hr-1", metric="heart_rate_bpm", value=72,
+        interval_start=None, is_demo=False,
+        data_origin="nodomain.freeyourgadget.gadgetbridge", **changes,
+    )
+
+
+def test_real_health_is_opt_in(client, monkeypatch):
+    _, auth = account(client)
+    monkeypatch.delenv("SHIYI_ENABLE_REAL_HEALTH", raising=False)
+    assert real_consent(client, auth).status_code == 403
+    assert upload(client, auth, hr()).status_code == 403
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    assert consent(client, auth, metric="heart_rate_bpm").status_code == 200
+    assert upload(client, auth, hr()).status_code == 403
+    assert real_consent(client, auth).json()["policy_version"] == POLICY
+    first = upload(client, auth, hr())
+    assert first.status_code == 200, first.text
+    assert upload(client, auth, hr()).json()["items"][0]["duplicate"]
+    items = client.get(HEALTH + "/observations", headers=auth).json()["items"]
+    assert items[0]["is_demo"] is False
+    assert items[0]["data_origin"] == "nodomain.freeyourgadget.gadgetbridge"
+    monkeypatch.delenv("SHIYI_ENABLE_REAL_HEALTH")
+    assert real_consent(client, auth, granted=False).status_code == 200
+    assert upload(client, auth, hr()).status_code == 403
+
+
+def test_real_health_account_isolation_and_atomicity(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, alice = account(client)
+    _, bob = account(client, "bob")
+    assert real_consent(client, alice).status_code == 200
+    assert real_consent(client, {"Authorization": "Bearer development-token-123"}).status_code == 403
+    steps = sample(is_demo=False, data_origin="nodomain.freeyourgadget.gadgetbridge")
+    assert upload(client, alice, hr(), steps).status_code == 403
+    assert client.get(HEALTH + "/observations", headers=alice).json()["items"] == []
+    assert upload(client, alice, hr()).status_code == 200
+    assert client.get(HEALTH + "/observations", headers=bob).json()["items"] == []
+    assert upload(client, bob, hr()).status_code == 403
+    assert real_consent(client, alice, "steps").status_code == 200
+    assert upload(client, alice, steps).status_code == 200
+    assert real_consent(client, alice, "sleep_minutes").status_code == 200
+    sleep = sample(
+        client_sample_id="sleep-1", metric="sleep_minutes", value=420,
+        interval_start=(NOW - timedelta(hours=8)).isoformat(),
+        is_demo=False, data_origin="nodomain.freeyourgadget.gadgetbridge",
+    )
+    assert upload(client, alice, sleep).status_code == 200
+
+
+def test_provenance_validation(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    assert real_consent(client, auth).status_code == 200
+    assert upload(client, auth, {**hr(), "data_origin": None}).status_code == 422
+    assert upload(client, auth, {**hr(), "source": "demo"}).status_code == 422
+    assert upload(client, auth, {**hr(), "is_demo": "false"}).status_code == 422
+    assert upload(client, auth, {**hr(), "is_demo": True}).status_code == 422
+
+
+def test_embedded_gadgetbridge_source(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    payload = {**hr(), "source": "gadgetbridge", "data_origin": "org.aihealthy.shiyi.embedded"}
+    assert real_consent(client, auth).status_code == 200
+    assert upload(client, auth, payload).status_code == 403
+    response = client.put(
+        HEALTH + "/consents/gadgetbridge/heart_rate_bpm", headers=auth,
+        json={"granted": True, "policy_version": POLICY},
+    )
+    assert response.status_code == 200
+    assert upload(client, auth, payload).status_code == 200
+
+
+def test_wearable_stream_summary_and_revocation(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    for metric in ("steps", "sleep_minutes", "heart_rate_bpm"):
+        assert real_consent(client, auth, metric).status_code == 200
+    scope = "a" * 32
+    common = {"is_demo": False, "data_origin": "test.app", "device_scope": scope}
+    rows = [
+        sample(**common),
+        sample(**{**common, "client_sample_id": "other-device", "device_scope": "b" * 32}),
+        sample(**{**common, "client_sample_id": "old", "device_scope": None}),
+        sample(**{**common, "client_sample_id": "sleep1", "metric": "sleep_minutes",
+                  "value": 120, "observed_at": (NOW - timedelta(hours=8)).isoformat(),
+                  "interval_start": (NOW - timedelta(hours=10)).isoformat()}),
+        sample(**{**common, "client_sample_id": "sleep2", "metric": "sleep_minutes",
+                  "value": 120, "observed_at": (NOW - timedelta(hours=7)).isoformat(),
+                  "interval_start": (NOW - timedelta(hours=9)).isoformat()}),
+        sample(**{**common, "client_sample_id": "hr1", "metric": "heart_rate_bpm",
+                  "value": 72, "interval_start": None}),
+    ]
+    assert upload(client, auth, *rows).status_code == 200
+    params = {"source": "health_connect", "data_origin": "test.app", "device_scope": scope}
+    endpoint = HEALTH + "/summary"
+    result = client.get(endpoint, headers=auth, params=params)
+    assert result.status_code == 200, result.text
+    data = result.json()
+    assert data["steps"] == 1200
+    assert data["sleep_minutes"] == 180
+    assert data["heart_rate_bpm"] == 72
+    assert len(client.get(HEALTH + "/streams", headers=auth).json()) == 2
+    assert client.get(endpoint, headers=other, params=params).status_code == 404
+    assert real_consent(client, auth, "steps", granted=False).status_code == 200
+    assert client.get(endpoint, headers=auth, params=params).json()["steps"] is None
+    assert client.get(endpoint, headers=auth, params={**params, "timezone": "invalid"}).status_code == 422
+
+
+def test_stream_scope_backfill_idempotency(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    assert real_consent(client, auth).status_code == 200
+    original = hr()
+    assert upload(client, auth, original).status_code == 200
+    scoped = {**original, "device_scope": "a" * 32}
+    assert upload(client, auth, scoped).json()["items"][0]["duplicate"]
+    assert upload(client, auth, original).json()["items"][0]["duplicate"]
+    assert upload(client, auth, {**scoped, "device_scope": "b" * 32}).status_code == 409
+    assert len(client.get(HEALTH + "/observations", headers=auth).json()["items"]) == 1
+    assert client.get(HEALTH + "/streams", headers=auth).json()[0]["device_scope"] == "a" * 32
+
+
+def test_daily_summary_midnight_and_overlapping_steps(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    assert real_consent(client, auth, "steps").status_code == 200
+    assert real_consent(client, auth).status_code == 200
+    scope = "a" * 32
+    origin = "test.app"
+    base = {"is_demo": False, "data_origin": origin, "device_scope": scope}
+    before = NOW - timedelta(hours=17)
+    midnight = NOW - timedelta(hours=16)
+    rows = [
+        sample(**{**base, "client_sample_id": "s1", "observed_at": before.isoformat(),
+                  "interval_start": (before - timedelta(minutes=30)).isoformat()}),
+        sample(**{**base, "client_sample_id": "s2",
+                  "observed_at": (before + timedelta(minutes=10)).isoformat(),
+                  "interval_start": (before - timedelta(minutes=20)).isoformat()}),
+        sample(**{**base, "client_sample_id": "hr-before", "metric": "heart_rate_bpm",
+                  "value": 71, "interval_start": None, "observed_at": before.isoformat()}),
+        sample(**{**base, "client_sample_id": "hr-midnight", "metric": "heart_rate_bpm",
+                  "value": 90, "interval_start": None, "observed_at": midnight.isoformat()}),
+    ]
+    assert upload(client, auth, *rows).status_code == 200
+    params = {"source": "health_connect", "data_origin": origin, "device_scope": scope,
+              "timezone": "Asia/Shanghai", "day": "2026-11-14"}
+    result = client.get(HEALTH + "/summary", headers=auth, params=params)
+    assert result.status_code == 200, result.text
+    assert result.json()["heart_rate_bpm"] == 71
+    assert result.json()["steps"] is None
+    assert "steps_overlap" in result.json()["issues"]
+
+
+def test_health_state_is_scoped_and_consent_gated(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    assert real_consent(client, auth).status_code == 200
+    scope = "a" * 32
+    item = {**hr(), "device_scope": scope}
+    assert upload(client, auth, item).status_code == 200
+    params = {"source": "health_connect", "data_origin": item["data_origin"],
+              "device_scope": scope}
+    endpoint = HEALTH + "/state"
+    response = client.get(endpoint, headers=auth, params=params)
+    assert response.status_code == 200, response.text
+    assert response.json()["algorithm"] == "robust_baseline_v1"
+    assert response.json()["events"] == []
+    assert response.json()["pressure_status"] == "insufficient_evidence"
+    assert client.get(endpoint, headers=other, params=params).status_code == 404
+    assert real_consent(client, auth, granted=False).status_code == 200
+    assert client.get(endpoint, headers=auth, params=params).status_code == 404
+    monkeypatch.delenv("SHIYI_ENABLE_REAL_HEALTH")
+    assert client.get(endpoint, headers=auth, params=params).status_code == 403
+
+
+def test_pressure_checkins_and_aligned_features(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    for metric in ("steps", "heart_rate_bpm"):
+        assert real_consent(client, auth, metric).status_code == 200
+    scope = "a" * 32
+    origin = "test.app"
+    common = {"is_demo": False, "data_origin": origin, "device_scope": scope}
+    rows = []
+    for i in range(40):
+        a = NOW - timedelta(minutes=40-i)
+        b = a + timedelta(minutes=1)
+        rows.append(sample(**{**common, "client_sample_id": f"steps-{i}", "value": 0,
+                              "interval_start": a.isoformat(), "observed_at": b.isoformat()}))
+    for i in range(6):
+        rows.append(sample(**{**common, "client_sample_id": f"hr-{i}", "value": 70+i,
+                              "metric": "heart_rate_bpm", "interval_start": None,
+                              "observed_at": (NOW-timedelta(minutes=5*i)).isoformat()}))
+    assert upload(client, auth, *rows).status_code == 200
+    root = HEALTH + "/pressure"
+    body = {"client_checkin_id": "check-1", "source": "health_connect",
+            "data_origin": origin, "device_scope": scope, "perceived_stress": 6,
+            "context": "studying", "observed_at": NOW.isoformat()}
+    assert client.post(root+"/checkins", headers=auth, json=body).status_code == 403
+    policy = {"granted": True, "policy_version": "pressure-checkin-v1"}
+    assert client.put(root+"/consent", headers=auth, json=policy).status_code == 200
+    created = client.post(root+"/checkins", headers=auth, json=body)
+    assert created.status_code == 200, created.text
+    key = created.json()["checkin_id"]
+    assert client.post(root+"/checkins", headers=auth, json=body).json()["checkin_id"] == key
+    assert client.post(root+"/checkins", headers=auth,
+                       json={**body, "perceived_stress": 7}).status_code == 409
+    path = root+"/checkins/"+key+"/features"
+    pair = client.get(path, headers=auth)
+    assert pair.status_code == 200, pair.text
+    assert pair.json()["eligible_for_research"]
+    assert pair.json()["heart_rate_median"] == 72.5
+    assert pair.json()["recorded_steps"] == 0
+    assert client.get(root+"/checkins", headers=other).json() == []
+    assert client.put(root+"/consent", headers=other, json=policy).status_code == 200
+    assert client.get(path, headers=other).status_code == 404
+    assert real_consent(client, auth, "steps", granted=False).status_code == 200
+    assert not client.get(path, headers=auth).json()["eligible_for_research"]
+    assert client.put(root+"/consent", headers=auth,
+                      json={**policy, "granted": False}).status_code == 200
+    assert client.get(path, headers=auth).status_code == 403
+    assert len(client.get(root+"/checkins", headers=auth).json()) == 1
+    assert client.delete(root+"/checkins/"+key, headers=auth).status_code == 204
+
+
+def test_pressure_research_requires_separate_consent(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    assert real_consent(client, auth).status_code == 200
+    item = {**hr(), "device_scope": "a"*32}
+    assert upload(client, auth, item).status_code == 200
+    base = HEALTH + "/pressure"
+    request = {k: item[k] for k in ("source", "data_origin", "device_scope")}
+    research = {"granted": True, "policy_version": "pressure-research-v1"}
+    checkin = {"granted": True, "policy_version": "pressure-checkin-v1"}
+    endpoint = base + "/research/evaluate"
+    assert client.put(base+"/research/consent", headers=auth, json=research).status_code == 403
+    assert client.put(base+"/consent", headers=auth, json=checkin).status_code == 200
+    assert client.post(endpoint, headers=auth, json=request).status_code == 403
+    assert client.put(base+"/research/consent", headers=auth, json=research).status_code == 200
+    result = client.post(endpoint, headers=auth, json=request)
+    assert result.status_code == 200, result.text
+    assert result.json()["status"] == "insufficient_data"
+    assert not result.json()["deployable"]
+    assert client.post(endpoint, headers=other, json=request).status_code == 403
+    assert client.put(base+"/consent", headers=auth,
+                      json={**checkin, "granted": False}).status_code == 200
+    assert not client.get(base+"/research/consent", headers=auth).json()["granted"]
+    assert client.post(endpoint, headers=auth, json=request).status_code == 403

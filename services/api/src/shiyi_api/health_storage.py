@@ -1,10 +1,12 @@
-"""Consent-gated, user-scoped synthetic health observations."""
+"""Consent-gated, user-scoped health observations."""
 import json
+import os
 from contextlib import closing
 from datetime import timedelta
 from uuid import uuid4
 
 from . import storage
+from .health_contract import REAL_METRICS, REAL_POLICY, REAL_SOURCES
 from .storage import StoreError
 
 SCHEMA = """
@@ -50,7 +52,16 @@ def list_consents(store, user):
         )]
 
 
+def real_ingestion_enabled():
+    return os.environ.get("SHIYI_ENABLE_REAL_HEALTH", "0") == "1"
+
+
 def update_consent(store, user, source, metric, payload):
+    if payload.policy_version == REAL_POLICY:
+        if source not in REAL_SOURCES or metric not in REAL_METRICS:
+            raise StoreError(422, "Unsupported real consent source or metric")
+        if payload.granted and (not real_ingestion_enabled() or not user.startswith("usr_")):
+            raise StoreError(403, "Real collection is disabled or requires a registered account")
     if metric == "energy_level" and source not in {"demo", "self_report"}:
         raise StoreError(422, "Unsupported source and metric combination")
     now = storage.stamp(storage.now_utc())
@@ -59,7 +70,8 @@ def update_consent(store, user, source, metric, payload):
             "SELECT * FROM health_consents WHERE user_id=? AND source=? AND metric=?",
             (user, source, metric),
         ).fetchone()
-        if row and bool(row["granted"]) == payload.granted:
+        if (row and bool(row["granted"]) == payload.granted
+                and row["policy_version"] == payload.policy_version):
             return {key: row[key] for key in (
                 "source", "metric", "granted", "policy_version", "updated_at"
             )}
@@ -87,23 +99,41 @@ def upload(store, user, batch):
     # All-or-nothing ingestion; serialize with consent updates.
     with store.transaction() as db:
         for item in batch.observations:
+            if not item.is_demo and (not real_ingestion_enabled() or not user.startswith("usr_")):
+                raise StoreError(403, "Real collection is disabled or requires a registered account")
             if item.observed_at > now + timedelta(minutes=5):
                 raise StoreError(422, "Observation timestamp is in the future")
             consent = db.execute(
-                """SELECT granted FROM health_consents
+                """SELECT granted,policy_version FROM health_consents
                    WHERE user_id=? AND source=? AND metric=?""",
                 (user, item.source, item.metric),
             ).fetchone()
             if not consent or not consent["granted"]:
                 raise StoreError(403, "Observation source and metric require consent")
-            encoded = item.model_dump_json()
+            if not item.is_demo and consent["policy_version"] != REAL_POLICY:
+                raise StoreError(403, "Explicit real-data consent required")
+            # Keep the existing synthetic JSON representation byte-for-byte for retries.
+            excluded = {"data_origin", "device_scope"} if item.is_demo else set()
+            if item.device_scope is None:
+                excluded.add("device_scope")
+            encoded = item.model_dump_json(exclude=excluded)
             prior = db.execute(
                 """SELECT observation_id,payload_json FROM health_observations
                    WHERE user_id=? AND source=? AND metric=? AND client_sample_id=?""",
                 (user, item.source, item.metric, item.client_sample_id),
             ).fetchone()
             if prior and prior["payload_json"] != encoded:
-                raise StoreError(409, "Sample identifier reused with different data")
+                old, new = json.loads(prior["payload_json"]), json.loads(encoded)
+                old_scope, new_scope = old.pop("device_scope", None), new.pop("device_scope", None)
+                if old != new or (old_scope and new_scope and old_scope != new_scope):
+                    raise StoreError(409, "Sample identifier reused with different data")
+                # A verified repeat of an old unscoped sample can add its stream identity.
+                # Never replace an existing scope or erase it on an old-client retry.
+                if old_scope is None and new_scope is not None:
+                    db.execute(
+                        "UPDATE health_observations SET payload_json=? WHERE observation_id=?",
+                        (encoded, prior["observation_id"]),
+                    )
             observation_id = prior["observation_id"] if prior else str(uuid4())
             if prior is None:
                 db.execute(

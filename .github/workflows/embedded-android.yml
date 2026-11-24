@@ -1,0 +1,66 @@
+name: Embedded Android build
+on:
+  pull_request:
+    paths:
+      - 'apps/gadgetbridge-embedded/**'
+      - 'apps/android/**'
+      - 'scripts/build_embedded_gadgetbridge.py'
+      - '.github/workflows/embedded-android.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: embedded-android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: 'false'
+      - name: Install Android platform and build tools
+        run: |
+          sdkmanager --version
+          sdkmanager 'platforms;android-35' 'build-tools;34.0.0' 'build-tools;35.0.0' 'platform-tools'
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+      - name: Validate and prepare pinned upstream with ShiYi overlay
+        run: |
+          python3 -m py_compile scripts/build_embedded_gadgetbridge.py
+          python3 scripts/build_embedded_gadgetbridge.py --dest "$RUNNER_TEMP/shiyi-embedded"
+      - name: Compile embedded APK
+        working-directory: ${{ runner.temp }}/shiyi-embedded
+        run: bash ./gradlew :app:assembleMainlineDebug --no-daemon --stacktrace
+      - name: Test daily health aggregation
+        working-directory: ${{ runner.temp }}/shiyi-embedded
+        run: bash ./gradlew :app:testMainlineDebugUnitTest --tests org.aihealthy.shiyi.integration.embedded.DailyHealthAggregatorTest --no-daemon --stacktrace
+      - name: Verify debug APK exists
+        working-directory: ${{ runner.temp }}/shiyi-embedded
+        run: |
+          find app/build/outputs/apk/mainline/debug -name '*.apk' -type f -print
+          test -n "$(find app/build/outputs/apk/mainline/debug -name '*.apk' -type f -print -quit)"
+      - name: Package corresponding source
+        run: |
+          mkdir -p "$RUNNER_TEMP/shiyi-artifacts"
+          tar --exclude=.git --exclude=.gradle --exclude=build --exclude=local.properties \
+            -czf "$RUNNER_TEMP/shiyi-artifacts/shiyi-embedded-source.tar.gz" \
+            -C "$RUNNER_TEMP/shiyi-embedded" .
+          cp "$RUNNER_TEMP/shiyi-embedded"/app/build/outputs/apk/mainline/debug/*.apk "$RUNNER_TEMP/shiyi-artifacts/"
+          cd "$RUNNER_TEMP/shiyi-artifacts"
+          sha256sum *.apk *.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shiyi-embedded-debug
+          path: ${{ runner.temp }}/shiyi-artifacts/
+          if-no-files-found: error
+          retention-days: 7

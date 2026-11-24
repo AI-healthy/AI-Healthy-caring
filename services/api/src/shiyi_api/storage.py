@@ -69,9 +69,11 @@ class SessionStore:
             from .harness.repository import SCHEMA as harness_schema
             from .health_storage import SCHEMA as health_schema
             from .identity_storage import SCHEMA as identity_schema
+            from .pressure_storage import SCHEMA as pressure_schema
 
             db.executescript(
                 device_schema + identity_schema + health_schema + harness_schema + proactive_schema
+                + pressure_schema
             )
 
     def connect(self) -> sqlite3.Connection:

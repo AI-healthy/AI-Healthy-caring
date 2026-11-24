@@ -118,9 +118,9 @@ def prepare(dest):
     # Android advertisements can contain a name before BluetoothDevice caches it.
     candidate = dest / "app/src/main/java/nodomain/freeyourgadget/gadgetbridge/impl/GBDeviceCandidate.java"
     replace_once(candidate, "    public boolean isNameKnown() {",
-                 "    public void setShiYiAdvertisedName(String name) {\\n"
-                 "        if (name != null && !name.isEmpty()) deviceName = name;\\n"
-                 "    }\\n\\n"
+                 "    public void setShiYiAdvertisedName(String name) {\n"
+                 "        if (name != null && !name.isEmpty()) deviceName = name;\n"
+                 "    }\n\n"
                  "    public boolean isNameKnown() {")
 
     source = ROOT / "apps/android/app/src/main/java" / PACKAGE

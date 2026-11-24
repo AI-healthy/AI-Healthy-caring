@@ -1,10 +1,12 @@
-"""Consent-gated, user-scoped synthetic health observations."""
+"""Consent-gated, user-scoped health observations."""
 import json
+import os
 from contextlib import closing
 from datetime import timedelta
 from uuid import uuid4
 
 from . import storage
+from .health_contract import REAL_METRICS, REAL_POLICY
 from .storage import StoreError
 
 SCHEMA = """
@@ -50,7 +52,16 @@ def list_consents(store, user):
         )]
 
 
+def real_ingestion_enabled():
+    return os.environ.get("SHIYI_ENABLE_REAL_HEALTH", "0") == "1"
+
+
 def update_consent(store, user, source, metric, payload):
+    if payload.policy_version == REAL_POLICY:
+        if source != "health_connect" or metric not in REAL_METRICS:
+            raise StoreError(422, "Unsupported real consent source or metric")
+        if payload.granted and (not real_ingestion_enabled() or not user.startswith("usr_")):
+            raise StoreError(403, "Real collection is disabled or requires a registered account")
     if metric == "energy_level" and source not in {"demo", "self_report"}:
         raise StoreError(422, "Unsupported source and metric combination")
     now = storage.stamp(storage.now_utc())
@@ -59,7 +70,8 @@ def update_consent(store, user, source, metric, payload):
             "SELECT * FROM health_consents WHERE user_id=? AND source=? AND metric=?",
             (user, source, metric),
         ).fetchone()
-        if row and bool(row["granted"]) == payload.granted:
+        if (row and bool(row["granted"]) == payload.granted
+                and row["policy_version"] == payload.policy_version):
             return {key: row[key] for key in (
                 "source", "metric", "granted", "policy_version", "updated_at"
             )}
@@ -87,16 +99,21 @@ def upload(store, user, batch):
     # All-or-nothing ingestion; serialize with consent updates.
     with store.transaction() as db:
         for item in batch.observations:
+            if not item.is_demo and (not real_ingestion_enabled() or not user.startswith("usr_")):
+                raise StoreError(403, "Real collection is disabled or requires a registered account")
             if item.observed_at > now + timedelta(minutes=5):
                 raise StoreError(422, "Observation timestamp is in the future")
             consent = db.execute(
-                """SELECT granted FROM health_consents
+                """SELECT granted,policy_version FROM health_consents
                    WHERE user_id=? AND source=? AND metric=?""",
                 (user, item.source, item.metric),
             ).fetchone()
             if not consent or not consent["granted"]:
                 raise StoreError(403, "Observation source and metric require consent")
-            encoded = item.model_dump_json()
+            if not item.is_demo and consent["policy_version"] != REAL_POLICY:
+                raise StoreError(403, "Explicit real-data consent required")
+            # Keep the existing synthetic JSON representation byte-for-byte for retries.
+            encoded = item.model_dump_json(exclude={"data_origin"} if item.is_demo else None)
             prior = db.execute(
                 """SELECT observation_id,payload_json FROM health_observations
                    WHERE user_id=? AND source=? AND metric=? AND client_sample_id=?""",

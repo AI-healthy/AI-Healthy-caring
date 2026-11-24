@@ -1,16 +1,19 @@
-"""Typed, explicitly synthetic observation contracts for Android integration."""
+"""Typed observation contracts for Android integration."""
 from datetime import UTC, timedelta
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictInt, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
 Source = Literal["demo", "self_report", "health_connect", "vendor_sdk"]
-Metric = Literal["sleep_minutes", "steps", "energy_level", "resting_heart_rate_bpm"]
+Metric = Literal["sleep_minutes", "steps", "energy_level", "resting_heart_rate_bpm", "heart_rate_bpm"]
+REAL_METRICS = frozenset({"sleep_minutes", "steps", "heart_rate_bpm", "resting_heart_rate_bpm"})
+REAL_POLICY = "local-wearable-v1"
 RANGES = {
     "sleep_minutes": (0, 1440),
     "steps": (0, 200000),
     "energy_level": (1, 5),
     "resting_heart_rate_bpm": (1, 300),
+    "heart_rate_bpm": (1, 300),
 }
 
 
@@ -18,7 +21,7 @@ class ConsentUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     granted: bool
-    policy_version: Literal["local-demo-v1"]
+    policy_version: Literal["local-demo-v1", "local-wearable-v1"]
 
 
 class ConsentView(ConsentUpdate):
@@ -37,10 +40,18 @@ class ObservationInput(BaseModel):
     observed_at: AwareDatetime
     interval_start: AwareDatetime | None = None
     missing_reason: Literal["not_available", "not_worn", "sensor_error", "not_reported"] | None = None
-    is_demo: Literal[True]
+    is_demo: StrictBool
+    data_origin: str | None = Field(default=None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
     def check_sample(self):
+        if not self.is_demo:
+            if self.source != "health_connect" or self.metric not in REAL_METRICS:
+                raise ValueError("Unsupported real observation source or metric")
+            if not self.data_origin or not self.data_origin.strip():
+                raise ValueError("Real observations require their originating app package")
+        elif self.data_origin is not None:
+            raise ValueError("Demo records must not claim a real origin")
         self.observed_at = self.observed_at.astimezone(UTC)
         if self.interval_start is not None:
             self.interval_start = self.interval_start.astimezone(UTC)

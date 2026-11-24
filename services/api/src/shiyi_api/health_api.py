@@ -15,7 +15,7 @@ from .health_contract import (
 )
 from .storage import SessionStore, StoreError, get_store
 
-router = APIRouter(prefix="/api/v1/health", tags=["synthetic-health"])
+router = APIRouter(prefix="/api/v1/health", tags=["health-observations"])
 User = Annotated[str, Depends(current_user)]
 Store = Annotated[SessionStore, Depends(get_store)]
 

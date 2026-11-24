@@ -5,7 +5,7 @@
 此版本用于合成数据开发及 Android 接口联调。不是生产账号服务、医学数据系统或已接通的穿戴设备。
 必须使用测试用户名、独立测试密码和合成观测。仅监听本机（Android 模拟器可用 10.0.2.2）。
 不公开部署；启用真实数据前需要 TLS、登录限流、密码重置与账号注销、正式隐私同意与保留/删除策略、
-加密存储/备份、设备与厂商 SDK 实测。当前默认拒绝 is_demo=false，没有真实数据开关。
+加密存储/备份、设备与厂商 SDK 实测。默认拒绝真实上传；受控真机测试开关和新版授权见 [WEARABLE_INTEGRATION.md](WEARABLE_INTEGRATION.md)。
 
 ## 账户
 
@@ -85,7 +85,7 @@ uvicorn shiyi_api.main:app --host 127.0.0.1 --port 8000
 ```
 
 进入 /docs → register → login → Authorize → consent → observations。
-新 API 不读取真实穿戴数据；V0.5 Harness 可在明确开启后使用最小合成自评记录，且不外发记录至小智/LLM，
+默认模式不读取真实穿戴数据；V0.5 Harness 可在明确开启后使用最小合成自评记录，且不外发记录至小智/LLM，
 不安装 Android 或修改固件。后续 Agent Harness 应只通过经过授权的聚合查询读取最小必要数据。
 
 

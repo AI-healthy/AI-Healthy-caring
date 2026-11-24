@@ -1,5 +1,5 @@
 """Pure feature extraction and robust baseline rules for a single authorized stream."""
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from datetime import UTC, datetime, time, timedelta
 from statistics import median
 
@@ -43,6 +43,8 @@ def _intervals(rows, start, end):
 
 
 def _day_feature(day, value, count, coverage=None, reasons=()):
+    if value is None and not reasons:
+        reasons = ("no_valid_observations",)
     return DayFeature(
         day=day, value=value, observations=count, coverage_minutes=coverage,
         eligible=value is not None and not reasons, reasons=list(reasons),
@@ -70,7 +72,7 @@ def _low_step_hr(hr, steps, start, end):
         i = bisect_right(zero_starts, a) - 1
         if i < 0 or zeros[i][1] < t:
             continue
-        j = bisect_right(positive_starts, t) - 1
+        j = bisect_left(positive_starts, t) - 1
         if j >= 0 and positive[j][1] > a and positive[j][0] < t:
             continue
         points.setdefault(t, set()).add(r.value)

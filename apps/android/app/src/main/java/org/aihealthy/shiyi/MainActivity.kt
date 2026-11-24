@@ -1,6 +1,7 @@
 package org.aihealthy.shiyi
 
 import android.os.Bundle
+import org.aihealthy.shiyi.integration.healthconnect.WearablePanel
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -68,11 +69,14 @@ private fun ShiYiApp() {
                                 }
                             }
                         }
-                        item { Text("模拟演示：穿戴与机器人尚未连接。", color = Moss, fontSize = 12.sp) }
+                        item { Text("活动与机器人为演示；穿戴数据请在「我的」读取。", color = Moss, fontSize = 12.sp) }
                     }
                     1 -> item { SeasonCard("四时", "节气、地域与饮食文化小卡片，等待审核内容接入。") }
                     2 -> item { SeasonCard("探索", "散步、传统运动、食养与声音，找到自己的喜欢。") }
-                    else -> item { SeasonCard("我的", "这里将展示授权、个人记录、反馈与设备配对。") }
+                    else -> {
+                        item { SeasonCard("我的", "管理个人健康数据与授权。") }
+                        item { WearablePanel() }
+                    }
                 }
                 item { Spacer(Modifier.height(20.dp)) }
             }

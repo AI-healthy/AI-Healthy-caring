@@ -339,3 +339,26 @@ def test_daily_summary_midnight_and_overlapping_steps(client, monkeypatch):
     assert result.json()["heart_rate_bpm"] == 71
     assert result.json()["steps"] is None
     assert "steps_overlap" in result.json()["issues"]
+
+
+def test_health_state_is_scoped_and_consent_gated(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    assert real_consent(client, auth).status_code == 200
+    scope = "a" * 32
+    item = {**hr(), "device_scope": scope}
+    assert upload(client, auth, item).status_code == 200
+    params = {"source": "health_connect", "data_origin": item["data_origin"],
+              "device_scope": scope}
+    endpoint = HEALTH + "/state"
+    response = client.get(endpoint, headers=auth, params=params)
+    assert response.status_code == 200, response.text
+    assert response.json()["algorithm"] == "robust_baseline_v1"
+    assert response.json()["events"] == []
+    assert response.json()["pressure_status"] == "insufficient_evidence"
+    assert client.get(endpoint, headers=other, params=params).status_code == 404
+    assert real_consent(client, auth, granted=False).status_code == 200
+    assert client.get(endpoint, headers=auth, params=params).status_code == 404
+    monkeypatch.delenv("SHIYI_ENABLE_REAL_HEALTH")
+    assert client.get(endpoint, headers=auth, params=params).status_code == 403

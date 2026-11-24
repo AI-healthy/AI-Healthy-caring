@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from . import health_storage, health_summary
+from . import health_state_service, health_storage, health_summary
 from .auth import current_user
 from .health_contract import (
     BatchReceipt,
@@ -16,6 +16,7 @@ from .health_contract import (
     WearableStream,
     WearableSummary,
 )
+from .health_state_contract import HealthStateView
 from .storage import SessionStore, StoreError, get_store
 
 router = APIRouter(prefix="/api/v1/health", tags=["health-observations"])
@@ -75,3 +76,13 @@ def wearable_summary(
     return call(
         health_summary.daily, store, user, source, data_origin, device_scope, timezone, day
     )
+
+
+@router.get("/state", response_model=HealthStateView)
+def wearable_state(
+    user: User, store: Store, source: Literal["gadgetbridge", "health_connect"],
+    data_origin: Annotated[str, Query(min_length=1, max_length=200)],
+    device_scope: Annotated[str, Query(pattern=r"^[0-9a-f]{32}$")],
+    timezone: Annotated[str, Query(min_length=1, max_length=64)] = "Asia/Shanghai",
+):
+    return call(health_state_service.current, store, user, source, data_origin, device_scope, timezone)

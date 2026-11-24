@@ -1,0 +1,25 @@
+name: Embedded Android build
+on:
+  pull_request:
+    paths:
+      - 'apps/gadgetbridge-embedded/**'
+      - 'apps/android/**'
+      - 'scripts/build_embedded_gadgetbridge.py'
+      - '.github/workflows/embedded-android.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android platform
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build pinned upstream with ShiYi overlay
+        run: python3 scripts/build_embedded_gadgetbridge.py --dest "$RUNNER_TEMP/shiyi-embedded" --build

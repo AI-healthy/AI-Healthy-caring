@@ -86,3 +86,29 @@ def test_low_step_hr_needs_context_and_excludes_movement():
     rows.append(observation("steps", 100, start + timedelta(minutes=9), start + timedelta(minutes=8)))
     _, f = features(rows)
     assert f["low_step_hr_bpm"].recent[-1].value is None
+
+
+def test_fusion_counts_cardiac_once_and_prefers_resting():
+    from shiyi_api.health_state import fuse
+    from shiyi_api.health_state_contract import FeatureState, StateEvent
+
+    def f(name, direction):
+        return FeatureState(feature=name, baseline_days=14, baseline_median=60,
+                            baseline_mad=0, recent=[], deviation_z=2, trend_per_day=0,
+                            direction=direction, evidence="adequate_for_rule")
+
+    def e(name, code):
+        return StateEvent(feature=name, code=code, days=[], baseline_median=60,
+                          recent_values=[80, 80, 80], evidence="adequate_for_rule")
+
+    low = e("low_step_hr_bpm", "low_step_hr_higher")
+    resting = e("resting_hr_bpm", "resting_hr_higher")
+    sleep = e("recorded_sleep_minutes", "recorded_sleep_lower")
+    features = [f("resting_hr_bpm", "higher"), f("low_step_hr_bpm", "higher"),
+                f("recorded_sleep_minutes", "lower")]
+    result = fuse(features, [low, resting, sleep])
+    assert result.pattern == "multi_domain_change"
+    assert result.domains == ["cardiac", "sleep"]
+    assert "low_step_hr_higher" not in result.supporting_events
+    assert fuse(features, [low, resting]).pattern == "single_domain_change"
+    assert fuse([f("resting_hr_bpm", "within_reference")], [low]).domains == []

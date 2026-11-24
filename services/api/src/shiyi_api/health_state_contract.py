@@ -43,6 +43,17 @@ class StateEvent(BaseModel):
     evidence: Literal["limited", "adequate_for_rule"]
 
 
+class FusedState(BaseModel):
+    pattern: Literal[
+        "insufficient", "no_sustained_pattern", "single_domain_change", "multi_domain_change"
+    ]
+    domains: list[Literal["sleep", "activity", "cardiac"]]
+    supporting_events: list[str]
+    assessed_domains: list[str]
+    evidence: Literal["insufficient", "limited", "adequate_for_rule"]
+    interpretation: Literal["descriptive_only"] = "descriptive_only"
+
+
 class HealthStateView(BaseModel):
     algorithm: Literal["robust_baseline_v1"] = "robust_baseline_v1"
     stream: WearableStream
@@ -55,5 +66,6 @@ class HealthStateView(BaseModel):
     recent_end: date
     features: list[FeatureState]
     events: list[StateEvent]
+    fusion: FusedState | None = None
     pressure_status: Literal["insufficient_evidence"] = "insufficient_evidence"
     pressure_reasons: list[str]

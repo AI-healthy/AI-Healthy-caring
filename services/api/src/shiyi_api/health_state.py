@@ -3,7 +3,7 @@ from bisect import bisect_left, bisect_right
 from datetime import UTC, datetime, time, timedelta
 from statistics import median
 
-from .health_state_contract import DayFeature, FeatureState, HealthStateView, StateEvent
+from .health_state_contract import DayFeature, FeatureState, FusedState, HealthStateView, StateEvent
 from .health_summary import _sleep, _steps
 
 BASELINE_DAYS = 14
@@ -168,6 +168,36 @@ def _feature(name, days):
     ), event
 
 
+def fuse(features, events):
+    """Combine distinct domains, not correlated measurements of the same signal."""
+    domains = {
+        "recorded_sleep_minutes": "sleep", "recorded_steps": "activity",
+        "resting_hr_bpm": "cardiac", "low_step_hr_bpm": "cardiac",
+    }
+    assessed = sorted({domains[f.feature] for f in features if f.direction != "insufficient"})
+    # Prefer explicit resting measurements when they have sufficient evidence.
+    resting_ready = any(
+        f.feature == "resting_hr_bpm" and f.direction != "insufficient" for f in features
+    )
+    chosen = [e for e in events if not (resting_ready and e.feature == "low_step_hr_bpm")]
+    active = sorted({domains[e.feature] for e in chosen})
+    if not assessed:
+        pattern = "insufficient"
+    elif len(active) >= 2:
+        pattern = "multi_domain_change"
+    elif active:
+        pattern = "single_domain_change"
+    else:
+        pattern = "no_sustained_pattern"
+    evidence = "insufficient" if not assessed else "limited"
+    if len(assessed) >= 2 and chosen and all(e.evidence == "adequate_for_rule" for e in chosen):
+        evidence = "adequate_for_rule"
+    return FusedState(
+        pattern=pattern, domains=active, supporting_events=[e.code for e in chosen],
+        assessed_domains=assessed, evidence=evidence,
+    )
+
+
 def estimate(stream, timezone, zone, now, observations):
     """Exclude today and the recent window from the baseline; no future samples."""
     recent_end = now.astimezone(zone).date() - timedelta(days=1)
@@ -194,7 +224,7 @@ def estimate(stream, timezone, zone, now, observations):
         stream=stream, timezone=timezone, as_of=now,
         last_observed_at=max((r.observed_at for r in valid if r.value is not None), default=None),
         baseline_start=baseline_start, baseline_end=recent_start - timedelta(days=1),
-        recent_start=recent_start, recent_end=recent_end, features=features, events=events,
+        recent_start=recent_start, recent_end=recent_end, features=features, events=events, fusion=fuse(features, events),
         pressure_reasons=["no_validated_stress_model", "no_rr_intervals_or_hrv",
-                          "no_contextual_self_report_labels"],
+                          "no_validated_self_report_model"],
     )

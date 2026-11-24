@@ -362,3 +362,54 @@ def test_health_state_is_scoped_and_consent_gated(client, monkeypatch):
     assert client.get(endpoint, headers=auth, params=params).status_code == 404
     monkeypatch.delenv("SHIYI_ENABLE_REAL_HEALTH")
     assert client.get(endpoint, headers=auth, params=params).status_code == 403
+
+
+def test_pressure_checkins_and_aligned_features(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    for metric in ("steps", "heart_rate_bpm"):
+        assert real_consent(client, auth, metric).status_code == 200
+    scope = "a" * 32
+    origin = "test.app"
+    common = {"is_demo": False, "data_origin": origin, "device_scope": scope}
+    rows = []
+    for i in range(40):
+        a = NOW - timedelta(minutes=40-i)
+        b = a + timedelta(minutes=1)
+        rows.append(sample(**{**common, "client_sample_id": f"steps-{i}", "value": 0,
+                              "interval_start": a.isoformat(), "observed_at": b.isoformat()}))
+    for i in range(6):
+        rows.append(sample(**{**common, "client_sample_id": f"hr-{i}", "value": 70+i,
+                              "metric": "heart_rate_bpm", "interval_start": None,
+                              "observed_at": (NOW-timedelta(minutes=5*i)).isoformat()}))
+    assert upload(client, auth, *rows).status_code == 200
+    root = HEALTH + "/pressure"
+    body = {"client_checkin_id": "check-1", "source": "health_connect",
+            "data_origin": origin, "device_scope": scope, "perceived_stress": 6,
+            "context": "studying", "observed_at": NOW.isoformat()}
+    assert client.post(root+"/checkins", headers=auth, json=body).status_code == 403
+    policy = {"granted": True, "policy_version": "pressure-checkin-v1"}
+    assert client.put(root+"/consent", headers=auth, json=policy).status_code == 200
+    created = client.post(root+"/checkins", headers=auth, json=body)
+    assert created.status_code == 200, created.text
+    key = created.json()["checkin_id"]
+    assert client.post(root+"/checkins", headers=auth, json=body).json()["checkin_id"] == key
+    assert client.post(root+"/checkins", headers=auth,
+                       json={**body, "perceived_stress": 7}).status_code == 409
+    path = root+"/checkins/"+key+"/features"
+    pair = client.get(path, headers=auth)
+    assert pair.status_code == 200, pair.text
+    assert pair.json()["eligible_for_research"]
+    assert pair.json()["heart_rate_median"] == 72.5
+    assert pair.json()["recorded_steps"] == 0
+    assert client.get(root+"/checkins", headers=other).json() == []
+    assert client.put(root+"/consent", headers=other, json=policy).status_code == 200
+    assert client.get(path, headers=other).status_code == 404
+    assert real_consent(client, auth, "steps", granted=False).status_code == 200
+    assert not client.get(path, headers=auth).json()["eligible_for_research"]
+    assert client.put(root+"/consent", headers=auth,
+                      json={**policy, "granted": False}).status_code == 200
+    assert client.get(path, headers=auth).status_code == 403
+    assert len(client.get(root+"/checkins", headers=auth).json()) == 1
+    assert client.delete(root+"/checkins/"+key, headers=auth).status_code == 204

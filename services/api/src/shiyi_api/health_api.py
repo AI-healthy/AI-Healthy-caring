@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from . import health_state_service, health_storage, health_summary
+from . import health_state_service, health_storage, health_summary, pressure_storage
 from .auth import current_user
 from .health_contract import (
     BatchReceipt,
@@ -17,6 +17,7 @@ from .health_contract import (
     WearableSummary,
 )
 from .health_state_contract import HealthStateView
+from .pressure_contract import PressureCheckin, PressureCheckinInput, PressureConsent, PressurePair
 from .storage import SessionStore, StoreError, get_store
 
 router = APIRouter(prefix="/api/v1/health", tags=["health-observations"])
@@ -86,3 +87,36 @@ def wearable_state(
     timezone: Annotated[str, Query(min_length=1, max_length=64)] = "Asia/Shanghai",
 ):
     return call(health_state_service.current, store, user, source, data_origin, device_scope, timezone)
+
+
+@router.get("/pressure/consent", response_model=PressureConsent)
+def pressure_consent(user: User, store: Store):
+    return call(pressure_storage.get_consent, store, user)
+
+
+@router.put("/pressure/consent", response_model=PressureConsent)
+def set_pressure_consent(payload: PressureConsent, user: User, store: Store):
+    return call(pressure_storage.consent, store, user, payload)
+
+
+@router.post("/pressure/checkins", response_model=PressureCheckin)
+def pressure_checkin(payload: PressureCheckinInput, user: User, store: Store):
+    return call(pressure_storage.create, store, user, payload)
+
+
+@router.get("/pressure/checkins", response_model=list[PressureCheckin])
+def pressure_history(
+    user: User, store: Store, limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+):
+    return call(pressure_storage.history, store, user, limit, offset)
+
+
+@router.get("/pressure/checkins/{checkin_id}/features", response_model=PressurePair)
+def pressure_features(checkin_id: str, user: User, store: Store):
+    return call(pressure_storage.pair, store, user, checkin_id)
+
+
+@router.delete("/pressure/checkins/{checkin_id}", status_code=204)
+def delete_pressure_checkin(checkin_id: str, user: User, store: Store):
+    call(pressure_storage.delete, store, user, checkin_id)

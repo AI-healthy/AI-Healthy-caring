@@ -23,3 +23,15 @@ GET /api/v1/health/state?source=gadgetbridge&data_origin=org.aihealthy.shiyi.emb
 ## 验收
 
 纯函数测试覆盖冷启动、历史极端值、持续变化、基线隔离、设备隔离、缺日、活动覆盖、低步数心率和运动混淆。HTTP 测试覆盖权限、设备归属、撤回授权和功能开关。合成测试仅验证算法机制，不证明对真实压力的预测能力。
+
+
+## V2 多域状态融合与压力标签
+
+state API 新增 fusion：睡眠、活动、心率三个独立域。显式静息心率可评估时优先于低步数心率代理；两个心率事件不算两个独立域。输出 insufficient/no_sustained_pattern/single_domain_change/multi_domain_change、支持事件与已评估域。多域共同变化是描述性证据，不等同压力概率。
+
+压力研究接口（用户自己的数据，独立授权）：
+- GET/PUT /api/v1/health/pressure/consent，policy_version=pressure-checkin-v1。
+- POST /api/v1/health/pressure/checkins：client_checkin_id、source、data_origin、device_scope、perceived_stress（用户自评 0–10，非临床量表）、context（resting/studying/working/exercise/other/unknown）、observed_at（过去24小时内）。重复请求幂等，不允许更改同 ID。
+- GET /api/v1/health/pressure/checkins：用户审核自身历史；DELETE /api/v1/health/pressure/checkins/{id} 删除。
+- GET /api/v1/health/pressure/checkins/{id}/features：按当前授权、同设备、标签时间前30分钟匹配有效心率、低步数背景心率、步数及覆盖度。低步数判断额外读取前10分钟。只做事件时间的回顾性配对，允许手环历史补传，不宣称实时推理时可用。至少5个有效心率和5个低步数心率点、25分钟步数区间覆盖、可比情境、无区间冲突才标记 eligible_for_research。标签撤权阻止新标签及派生配对，历史可审计删除；传感器撤权即时排除对应特征。无自动上传、无跨用户训练、无模型调用。
+- 自评不是设备测得的压力真值。当前仅形成研究数据对；后续按时间/用户划分验证、校准与独立研究授权后才允许训练模型，不将特征可用性当作准确率。

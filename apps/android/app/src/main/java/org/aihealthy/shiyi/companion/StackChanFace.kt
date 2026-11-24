@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -102,10 +103,13 @@ internal fun StackChanFace(modifier: Modifier, motion: PetMotion, replay: Int = 
                     CornerRadius(15f))
                 drawCircle(Color(0xFF734F60), 3f, Offset(187f, 83f))
                 drawCircle(Color(0xFF734F60), 3f, Offset(187f, 94f))
-                drawRoundRect(Color(0xFFF0C4CE), Offset(47f, 32f), Size(136f, 114f),
+                drawRoundRect(Brush.linearGradient(listOf(Color(0xFFFFE7EB), Color(0xFFE3A4B5)),
+                    Offset(49f, 33f), Offset(175f, 146f)), Offset(47f, 32f), Size(136f, 114f),
                     CornerRadius(16f))
-                drawRoundRect(Color(0xFF302933), Offset(54f, 39f), Size(122f, 83f),
-                    CornerRadius(10f))
+                drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF49404E), Color(0xFF26222C)),
+                    39f, 122f), Offset(54f, 39f), Size(122f, 83f), CornerRadius(10f))
+                drawLine(Color(0x30FFFFFF), Offset(68f, 45f), Offset(157f, 45f),
+                    strokeWidth = 1.6f, cap = StrokeCap.Round)
                 for (x in listOf(84f, 115f, 146f)) {
                     drawRoundRect(Color(0xFFFFE7E9), Offset(x - 9f, 128f), Size(18f, 10f),
                         CornerRadius(3f))
@@ -121,7 +125,8 @@ internal fun StackChanFace(modifier: Modifier, motion: PetMotion, replay: Int = 
                         }
                         drawPath(eye, face, style = Stroke(3.5f, cap = StrokeCap.Round))
                     } else {
-                        drawOval(face, Offset(x - 2.5f, 72f), Size(5f, 11f))
+                        drawRoundRect(face, Offset(x - 3.5f, 71f), Size(7f, 13f),
+                            CornerRadius(3.5f))
                     }
                     if (happy) drawOval(pink, Offset(x - 7f, 88f), Size(13f, 6f))
                 }

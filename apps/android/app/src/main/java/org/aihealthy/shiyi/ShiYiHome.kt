@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
+import org.aihealthy.shiyi.companion.HomeStackChan
 
 private val Forest = Color(0xFF204D3D)
 private val Ivory = Color(0xF0FAF9E9)
@@ -80,6 +81,19 @@ internal fun ShiYiHome(
                         onClick = onHealth),
                 contentAlignment = Alignment.Center
             ) { ActivityRings(Modifier.size(124.dp * scale)) }
+
+            val petTop = ringTop + ringSize + 8.dp
+            val petRoom = maxHeight - petTop - 88.dp
+            HomeStackChan(
+                modifier = if (petRoom >= 124.dp) {
+                    Modifier.align(Alignment.TopEnd).padding(top = petTop, end = 23.dp)
+                        .width(156.dp).height(petRoom.coerceAtMost(174.dp))
+                } else {
+                    Modifier.align(Alignment.BottomEnd).padding(bottom = 86.dp, end = 20.dp)
+                        .width(110.dp).height(104.dp)
+                },
+                onChat = onChat
+            )
 
             Row(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth()

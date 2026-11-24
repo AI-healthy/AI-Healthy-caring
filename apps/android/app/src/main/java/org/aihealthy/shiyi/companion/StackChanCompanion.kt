@@ -126,7 +126,6 @@ internal fun StackChanCompanion(session: CompanionSession, modifier: Modifier = 
                         }
                     },
                     onLongClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         if (!openChatAfterGreeting) {
                             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                             motion = PetMotion.Shy

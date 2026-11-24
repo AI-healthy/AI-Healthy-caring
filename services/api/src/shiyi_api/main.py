@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .activity_api import router as activity_router
+from .companion_api import router as companion_router
 from .device_api import router as device_router
 from .harness.api import router as harness_router
 from .harness.proactive_api import router as proactive_router
@@ -27,6 +28,7 @@ app = FastAPI(
 
 app.include_router(activity_router)
 app.include_router(device_router)
+app.include_router(companion_router)
 app.include_router(identity_router)
 app.include_router(health_router)
 app.include_router(harness_router)

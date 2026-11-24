@@ -1,6 +1,8 @@
 package org.aihealthy.shiyi
 
 import android.os.Bundle
+import org.aihealthy.shiyi.companion.CompanionSession
+import org.aihealthy.shiyi.companion.StackChanCompanion
 import org.aihealthy.shiyi.integration.healthconnect.WearablePanel
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,7 +33,8 @@ class MainActivity : ComponentActivity() {
 private fun ShiYiApp() {
     var tab by remember { mutableIntStateOf(0) }
     var message by remember { mutableStateOf("今天也可以从一件小事开始。") }
-    val tabs = listOf("今日", "四时", "探索", "我的")
+    val companion = remember { CompanionSession() }
+    val tabs = listOf("今日", "四时", "探索", "我的", "陪伴")
     MaterialTheme(colorScheme = lightColorScheme(primary = Moss, background = Paper)) {
         Scaffold(
             bottomBar = {
@@ -41,13 +44,15 @@ private fun ShiYiApp() {
                             selected = tab == index,
                             onClick = { tab = index },
                             label = { Text(title) },
-                            icon = { Text(listOf("◉", "◌", "✦", "☼")[index]) },
+                            icon = { Text(listOf("◉", "◌", "✦", "☼", "☺")[index]) },
                         )
                     }
                 }
             }
         ) { padding ->
-            LazyColumn(
+            if (tab == 4) {
+                StackChanCompanion(companion, Modifier.padding(padding))
+            } else LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {

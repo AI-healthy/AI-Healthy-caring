@@ -92,6 +92,10 @@ bridge.execute(command)
 
 示例见 `packages/contracts/stackchan-mcp-profile.example.json`。
 
+> 工具差异：官方 `hal_mcp.cpp` 只注册 `self.robot.get_head_angles`、`set_head_angles`、
+> `set_led_color`、`create_reminder`、`get_reminders`、`stop_reminder`；`self.face.*`、`self.head.nod`
+> 等来自社区补丁。接真机前必须 `GET /tools` 核对，按实际工具名改 profile。
+
 ## 5. 信息上传（触摸/摇晃/唤醒）
 
 MCP 的 `tools/call` 是请求/响应，不是事件流。两种做法：
@@ -140,3 +144,45 @@ POST /api/v1/devices/{device_id}/sensor-events   (设备 Bearer)
 
 `firmware/stackchan/` 继续保留为**产品化备选**：完全可控、可做 NVS 幂等与离线队列，
 但当前不实现唤醒词/CAMERA/AVATAR。比赛演示优先走本地 MCP 路线，避免丢失官方卖点。
+
+## 9. 官方 App 到底怎么连（源码核对）
+
+官方 App（Flutter）不是直接调 MCP：
+
+- 手机端 `LocalAreaNetworkService` 起一个 **WebSocket `/ws` 服务**；固件作为客户端连上来。
+- 端点通过远程 XiaoZhi 通道的 `AppLanAddress` 消息告知固件，未连接时每 3 秒重发。
+- 局域网帧头固定 20 字节：`SC` + version + type + flags + session + sequence + length。
+- 表情/动作/RGB 是二进制帧内的 **`ExpressionData` JSON**：
+  `leftEye/rightEye/mouth` 各含 `x/y/rotation/weight/size`，因此官方 App 可以画任意新表情。
+- BLE 通道也有一套 `bleAvatar`/`bleMotion` 数据。
+
+含义：**官方 App 的“更多表情”走 AVATAR 协议，不走 MCP**。如果我们的后端只接 MCP，
+能控制头/灯/提醒/内置表情，但要做全新的眼睛/嘴形，需要下面三条之一：
+
+1. 社区 MCP 固件提供 `self.face.overlay`（心形、害羞、汗、头晕等装饰）；
+2. 给社区固件加一个 MCP 工具，接收 `ExpressionData` JSON 并应用（推荐，改动小）；
+3. 后端完整模拟官方 App 的 LAN WebSocket + 端点通告（最复杂，且要拿远程通道）。
+
+## 10. Gateway 运行方式
+
+```bash
+export SHIYI_API_URL=http://127.0.0.1:8000
+export SHIYI_SIM_DEVICE_ID=stackchan-001
+export SHIYI_SIM_DEVICE_TOKEN=<设备 token>
+export SHIYI_STACKCHAN_MCP_URL=http://192.168.1.50:8788
+# 可选：export SHIYI_STACKCHAN_MCP_TOKEN=...
+python -m shiyi_api.stackchan_gateway
+```
+
+流程：轮询后端 `pending` → 发 ACK → `OfficialStackChan` 调 MCP → 按动作时长等待 →
+发 `COMMAND_COMPLETED`。它不处理触摸（HTTP MCP 没有事件流），触摸/摇晃上传需第 5 节的
+WebSocket 或轮询方案。
+
+## 11. 自定义表情的接口预留
+
+- 内置情绪（官方 `Emotion`）：`Neutral / Happy / Angry / Sad / Doubt / Sleepy`；
+- 装饰（decorators）：`angry / dizzy / heart / shy / sweat`，社区固件可映射为
+  `self.face.overlay`；
+- 当前 MCP 适配层已有 `OfficialStackChan.show_overlay(name)`，可直接调用；
+- 建议后续在设备契约里增加 `SET_FACE`（`expression` + `overlay` + `duration_ms`），
+  与 xu 同步后实现；若要画全新五官，需要固件侧新增 `self.face.set_expression(JSON)` 工具。

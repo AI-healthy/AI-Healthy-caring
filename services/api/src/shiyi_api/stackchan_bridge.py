@@ -233,3 +233,7 @@ class OfficialStackChan:
         for call in self.plan(command):
             results.append(BridgeResult(call, self.transport.call(call.tool, call.arguments)))
         return results
+
+    def show_overlay(self, name: str) -> Any:
+        """Extra expressions (heart/shy/sweat/dizzy/...) on community firmware."""
+        return self.transport.call("self.face.overlay", {"name": name})

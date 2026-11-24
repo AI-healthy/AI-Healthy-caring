@@ -1,6 +1,14 @@
 package org.aihealthy.shiyi.integration.embedded
 
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -12,7 +20,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import nodomain.freeyourgadget.gadgetbridge.activities.ControlCenterv2
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withTimeoutOrNull
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.honorband4.HonorBand4Coordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import org.aihealthy.shiyi.core.network.HealthApiClient
 import org.aihealthy.shiyi.integration.wearable.HealthMetric
@@ -20,13 +33,20 @@ import org.aihealthy.shiyi.integration.wearable.HealthObservation
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
+@SuppressLint("MissingPermission")
 @Composable
 fun WearablePanel() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val connection = remember(context) { NativeBandConnection(context) }
+    val states = remember { mutableStateMapOf<String, NativeBandConnection.State>() }
+    val found = remember { mutableStateMapOf<String, NativeBandConnection.Found>() }
     var bands by remember { mutableStateOf<List<GBDevice>>(emptyList()) }
+    var scanJob by remember { mutableStateOf<Job?>(null) }
+    var scanning by remember { mutableStateOf(false) }
+    var pendingAddress by remember { mutableStateOf<String?>(null) }
     var chosenAddress by remember { mutableStateOf<String?>(null) }
-    var status by remember { mutableStateOf("先进入设备管理，配对并初始化荣耀手环。") }
+    var status by remember { mutableStateOf("开启蓝牙，搜索并选择附近的荣耀手环 4。") }
     var busy by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<List<HealthObservation>>(emptyList()) }
     var server by remember { mutableStateOf("") }
@@ -34,11 +54,10 @@ fun WearablePanel() {
     var allowed by remember { mutableStateOf(false) }
 
     fun refreshDevices() {
-        bands = EmbeddedBandReader.bands()
-        if (bands.none { it.address == chosenAddress }) {
-            chosenAddress = bands.singleOrNull()?.address
-            preview = emptyList()
-        }
+        if (!connection.hasPermissions()) return
+        bands = connection.known()
+        bands.forEach { states[it.address] = connection.state(it) }
+        if (chosenAddress == null) chosenAddress = bands.singleOrNull()?.address
     }
 
     fun execute(block: suspend () -> Unit) {
@@ -56,34 +75,163 @@ fun WearablePanel() {
         }
     }
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        refreshDevices()
+        status = if (connection.hasPermissions()) "蓝牙权限已授权，可以搜索设备。"
+                 else "需要附近设备权限；旧版 Android 需要定位权限才能扫描。"
+    }
+    val enableLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { status = "请确认蓝牙已开启，再搜索设备。" }
+
+    DisposableEffect(context) {
+        val manager = LocalBroadcastManager.getInstance(context)
+        val receiver = object : BroadcastReceiver() {
+            @Suppress("DEPRECATION")
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == GBDevice.ACTION_DEVICE_CHANGED) {
+                    val device = intent.getParcelableExtra<GBDevice>(GBDevice.EXTRA_DEVICE)
+                    if (device != null && device.deviceCoordinator is HonorBand4Coordinator) {
+                        states[device.address] = connection.state(device)
+                    }
+                }
+                if (intent.action == DeviceManager.ACTION_DEVICES_CHANGED) refreshDevices()
+            }
+        }
+        manager.registerReceiver(receiver, IntentFilter().apply {
+            addAction(GBDevice.ACTION_DEVICE_CHANGED)
+            addAction(DeviceManager.ACTION_DEVICES_CHANGED)
+        })
+        onDispose {
+            manager.unregisterReceiver(receiver)
+            scanJob?.cancel()
+        }
+    }
+
     LaunchedEffect(Unit) { refreshDevices() }
+
+    fun startSearch() {
+        if (!connection.hasPermissions()) {
+            permissionLauncher.launch(connection.permissions())
+            return
+        }
+        if (connection.adapter == null) {
+            status = "本机没有蓝牙适配器。"
+            return
+        }
+        if (connection.adapter?.isEnabled != true) {
+            enableLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            return
+        }
+        found.clear()
+        refreshDevices()
+        scanning = true
+        status = "正在搜索附近的荣耀手环 4…"
+        scanJob = scope.launch {
+            try {
+                withTimeoutOrNull(12000L) {
+                    connection.scan().collect { band -> found[band.address] = band }
+                }
+                status = if (found.isEmpty() && bands.isEmpty())
+                    "没有找到手环。请靠近手机，断开其他手机或电脑的蓝牙连接后重试。"
+                    else "请选择要连接的手环。"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                status = "扫描失败，请检查蓝牙和系统权限。"
+            } finally {
+                scanning = false
+            }
+        }
+    }
+
+    fun connectBand(device: GBDevice) {
+        scanJob?.cancel()
+        chosenAddress = device.address
+        preview = emptyList()
+        execute {
+            pendingAddress = device.address
+            status = "正在连接并认证；如果手环显示确认请求，请在手环上确认。"
+            try {
+                connection.connect(device)
+                val ready = withTimeoutOrNull(90000L) {
+                    while (states[device.address]?.ready != true) {
+                        delay(400)
+                    }
+                    true
+                } == true
+                refreshDevices()
+                status = if (ready) "手环已连接并完成认证，可以同步健康记录。"
+                         else "连接尚未就绪，请检查手环确认、其他蓝牙连接和设备状态后重试。"
+            } finally {
+                pendingAddress = null
+            }
+        }
+    }
 
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("荣耀手环 · 内嵌驱动", style = MaterialTheme.typography.titleMedium)
-            Text("本应用内置 Gadgetbridge 设备管理和 BLE 驱动，不需要另外安装 Gadgetbridge。")
-            Button(enabled = !busy, onClick = {
-                preview = emptyList()
-                context.startActivity(Intent(context, ControlCenterv2::class.java))
-            }) { Text("设备管理 / 蓝牙配对") }
-            OutlinedButton(enabled = !busy, onClick = {
-                refreshDevices()
-                status = if (bands.isEmpty()) "尚未配对荣耀手环 4。" else "已刷新设备列表。"
-            }) { Text("刷新设备") }
-            for (band in bands) {
-                Row {
-                    RadioButton(selected = chosenAddress == band.address, enabled = !busy,
-                        onClick = { chosenAddress = band.address; preview = emptyList() })
-                    Text(band.name + if (band.isInitialized) " · 已就绪" else " · 未就绪")
+            Text("智能穿戴", style = MaterialTheme.typography.titleMedium)
+            Text("连接荣耀手环 4，查看心率、活动和睡眠记录。")
+            if (scanning) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+                OutlinedButton(onClick = {
+                    scanJob?.cancel()
+                    status = "已停止搜索，请选择设备。"
+                }) { Text("停止搜索") }
+            } else {
+                Button(enabled = !busy, onClick = { startSearch() }) {
+                    Text("搜索附近手环")
+                }
+            }
+            val addresses = (bands.map { it.address } + found.keys + listOfNotNull(pendingAddress)).distinct()
+            if (addresses.isEmpty()) Text("尚未发现设备。")
+            for (address in addresses) {
+                val candidate = found[address]
+                val known = bands.firstOrNull { it.address == address }
+                val device = known ?: candidate?.device
+                val state = states[address]
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(state?.name ?: candidate?.name ?: known?.name ?: "荣耀手环 4",
+                            style = MaterialTheme.typography.titleSmall)
+                        Text(when {
+                            state?.ready == true -> if (state.busy) "同步中" else "已连接"
+                            state?.connecting == true || pendingAddress == address -> "连接认证中"
+                            known != null -> "已配对 · 未连接"
+                            else -> "附近设备"
+                        } + (candidate?.let { " · 信号 " + it.rssi + " dBm" } ?: ""))
+                        if (device != null) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (state?.ready == true) {
+                                    OutlinedButton(enabled = !busy, onClick = {
+                                        execute {
+                                            connection.disconnect(device)
+                                            status = "已请求断开连接。"
+                                        }
+                                    }) { Text("断开") }
+                                    OutlinedButton(enabled = !busy, onClick = {
+                                        chosenAddress = address; preview = emptyList()
+                                    }) { Text(if (chosenAddress == address) "已选择" else "选择") }
+                                } else {
+                                    Button(enabled = !busy && state?.connecting != true,
+                                        onClick = { connectBand(device) }) { Text("连接手环") }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             val selected = bands.firstOrNull { it.address == chosenAddress }
-            Button(enabled = !busy && selected != null, onClick = {
+            val selectedState = chosenAddress?.let { states[it] }
+            Button(enabled = !busy && !scanning && selected != null &&
+                selectedState?.ready == true && !selectedState.busy, onClick = {
                 execute {
-                    refreshDevices()
-                    val band = bands.first { it.address == chosenAddress }
+                    val band = connection.known().first { it.address == chosenAddress }
                     EmbeddedBandReader.sync(band)
-                    status = "已请求同步。请在设备管理中确认同步结束，再读取本地记录。"
+                    status = "已请求同步；同步完成后点击读取最近七天。"
                 }
             }) { Text("同步手环历史数据") }
             Row {
@@ -93,7 +241,7 @@ fun WearablePanel() {
                 })
                 Text("同意在此页面读取所选手环的本地健康记录")
             }
-            Button(enabled = !busy && selected != null && allowed, onClick = {
+            Button(enabled = !busy && !scanning && selected != null && allowed && selectedState?.busy != true, onClick = {
                 preview = emptyList()
                 execute {
                     val band = EmbeddedBandReader.bands().first { it.address == chosenAddress }

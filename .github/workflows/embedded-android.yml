@@ -41,6 +41,9 @@ jobs:
       - name: Compile embedded APK
         working-directory: ${{ runner.temp }}/shiyi-embedded
         run: bash ./gradlew :app:assembleMainlineDebug --no-daemon --stacktrace
+      - name: Test daily health aggregation
+        working-directory: ${{ runner.temp }}/shiyi-embedded
+        run: bash ./gradlew :app:testMainlineDebugUnitTest --tests org.aihealthy.shiyi.integration.embedded.DailyHealthAggregatorTest --no-daemon --stacktrace
       - name: Verify debug APK exists
         working-directory: ${{ runner.temp }}/shiyi-embedded
         run: |

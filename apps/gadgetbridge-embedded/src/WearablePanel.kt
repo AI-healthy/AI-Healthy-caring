@@ -39,6 +39,7 @@ import java.time.temporal.ChronoUnit
 fun WearablePanel() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val dashboard = LocalHealthDashboard.current
     val connection = remember(context) { NativeBandConnection(context) }
     val states = remember { mutableStateMapOf<String, NativeBandConnection.State>() }
     val found = remember { mutableStateMapOf<String, NativeBandConnection.Found>() }
@@ -356,13 +357,17 @@ fun WearablePanel() {
             val selectedState = chosenAddress?.let { states[it] }
             Button(enabled = !busy && !scanning && selected != null &&
                 selectedState?.ready == true && !selectedState.busy &&
-                selected.deviceCoordinator.supportsActivityDataFetching(), onClick = {
+                selected.deviceCoordinator.supportsActivityDataFetching() && dashboard?.syncing != true, onClick = {
                 execute {
                     val band = connection.known().first { it.address == chosenAddress }
-                    EmbeddedBandReader.sync(band)
-                    status = "已请求同步；同步完成后点击读取最近七天。"
+                    status = if (dashboard != null && EmbeddedBandReader.supports(band)) dashboard.requestSync(band)
+                    else {
+                        EmbeddedBandReader.sync(band)
+                        "已请求同步；同步完成后点击读取最近七天。"
+                    }
                 }
             }) { Text("同步手环历史数据") }
+            DashboardSettings(selected)
             val hasReader = selected?.let { EmbeddedBandReader.supports(it) } == true
             if (selected != null && !hasReader) Text("此设备可连接；时宜健康数据转换适配尚未开放。")
             Row {
@@ -378,6 +383,7 @@ fun WearablePanel() {
                     val band = connection.known().first { it.address == chosenAddress }
                     val end = Instant.now()
                     preview = EmbeddedBandReader(band).read(end.minus(7, ChronoUnit.DAYS), end)
+                    dashboard?.useLocalRead(band, preview, end)
                     status = if (preview.isEmpty()) "暂无有效记录，先完成设备同步。"
                              else "已读取 " + preview.size + " 条记录。"
                 }

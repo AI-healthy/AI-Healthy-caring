@@ -66,8 +66,8 @@ def prepare(dest):
                  "apply plugin: 'org.jetbrains.kotlin.plugin.compose'")
     replace_once(gradle, 'applicationId "nodomain.freeyourgadget.gadgetbridge"',
                  'applicationId "org.aihealthy.shiyi.embedded"')
-    replace_once(gradle, 'versionName "0.83.0"', 'versionName "0.83.0-shiyi-multi-device"')
-    replace_once(gradle, "versionCode 235", "versionCode 239")
+    replace_once(gradle, 'versionName "0.83.0"', 'versionName "0.83.0-shiyi-health-dashboard"')
+    replace_once(gradle, "versionCode 235", "versionCode 240")
     replace_once(gradle, "compileSdk 34", "compileSdk 35")
     replace_once(gradle, "minSdkVersion 21", "minSdkVersion 26")
     replace_once(gradle, "        aidl true", "        compose true\n        aidl true")
@@ -133,7 +133,22 @@ def prepare(dest):
     replace_once(target / "MainActivity.kt",
                  "import org.aihealthy.shiyi.integration.healthconnect.WearablePanel",
                  "import org.aihealthy.shiyi.integration.embedded.WearablePanel")
+    replace_once(target / "MainActivity.kt",
+                 "import org.aihealthy.shiyi.integration.embedded.WearablePanel",
+                 "import org.aihealthy.shiyi.integration.embedded.WearablePanel\n"
+                 "import org.aihealthy.shiyi.integration.embedded.HealthDashboardHost\n"
+                 "import org.aihealthy.shiyi.integration.embedded.HealthOverviewCard")
+    replace_once(target / "MainActivity.kt", "setContent { ShiYiApp() }",
+                 "setContent { HealthDashboardHost(this) { ShiYiApp() } }")
+    replace_once(target / "MainActivity.kt",
+                 'item { Text("活动与机器人为演示；穿戴数据请在「我的」读取。", color = Moss, fontSize = 12.sp) }',
+                 'item { HealthOverviewCard(onManage = { tab = 3 }) }\n'
+                 '                        item { Text("活动与机器人为演示。", color = Moss, fontSize = 12.sp) }')
     shutil.copytree(ROOT / "apps/gadgetbridge-embedded/src", target / "integration/embedded")
+    test_target = dest / "app/src/test/java" / PACKAGE / "integration/embedded"
+    test_target.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "apps/gadgetbridge-embedded/tests/DailyHealthAggregatorTest.kt",
+                 test_target / "DailyHealthAggregatorTest.kt")
     # The upstream source, its license, and the complete overlay must accompany distribution.
     print(f"Prepared {dest}; build with ./gradlew :app:assembleMainlineDebug")
 

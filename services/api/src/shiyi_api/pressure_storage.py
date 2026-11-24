@@ -18,6 +18,11 @@ CREATE TABLE IF NOT EXISTS pressure_consent (
     granted INTEGER NOT NULL CHECK(granted IN (0,1)),
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pressure_research_consent (
+    user_id TEXT PRIMARY KEY,
+    granted INTEGER NOT NULL CHECK(granted IN (0,1)),
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS pressure_checkins (
     checkin_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -43,6 +48,9 @@ def consent(store, user, payload):
                updated_at=excluded.updated_at""",
             (user, int(payload.granted), storage.stamp(storage.now_utc())),
         )
+        if not payload.granted:
+            db.execute("UPDATE pressure_research_consent SET granted=0,updated_at=? WHERE user_id=?",
+                       (storage.stamp(storage.now_utc()), user))
     return payload
 
 

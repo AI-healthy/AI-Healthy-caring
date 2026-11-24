@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from . import health_state_service, health_storage, health_summary, pressure_storage
+from . import health_state_service, health_storage, health_summary, pressure_model_service, pressure_storage
 from .auth import current_user
 from .health_contract import (
     BatchReceipt,
@@ -18,6 +18,11 @@ from .health_contract import (
 )
 from .health_state_contract import HealthStateView
 from .pressure_contract import PressureCheckin, PressureCheckinInput, PressureConsent, PressurePair
+from .pressure_model_contract import (
+    PressureEvaluation,
+    PressureEvaluationRequest,
+    PressureResearchConsent,
+)
 from .storage import SessionStore, StoreError, get_store
 
 router = APIRouter(prefix="/api/v1/health", tags=["health-observations"])
@@ -120,3 +125,18 @@ def pressure_features(checkin_id: str, user: User, store: Store):
 @router.delete("/pressure/checkins/{checkin_id}", status_code=204)
 def delete_pressure_checkin(checkin_id: str, user: User, store: Store):
     call(pressure_storage.delete, store, user, checkin_id)
+
+
+@router.get("/pressure/research/consent", response_model=PressureResearchConsent)
+def pressure_research_consent(user: User, store: Store):
+    return call(pressure_model_service.get_consent, store, user)
+
+
+@router.put("/pressure/research/consent", response_model=PressureResearchConsent)
+def set_pressure_research_consent(payload: PressureResearchConsent, user: User, store: Store):
+    return call(pressure_model_service.set_consent, store, user, payload)
+
+
+@router.post("/pressure/research/evaluate", response_model=PressureEvaluation)
+def pressure_evaluate(payload: PressureEvaluationRequest, user: User, store: Store):
+    return call(pressure_model_service.run, store, user, payload)

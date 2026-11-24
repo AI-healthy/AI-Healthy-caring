@@ -413,3 +413,30 @@ def test_pressure_checkins_and_aligned_features(client, monkeypatch):
     assert client.get(path, headers=auth).status_code == 403
     assert len(client.get(root+"/checkins", headers=auth).json()) == 1
     assert client.delete(root+"/checkins/"+key, headers=auth).status_code == 204
+
+
+def test_pressure_research_requires_separate_consent(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    _, other = account(client, "bob")
+    assert real_consent(client, auth).status_code == 200
+    item = {**hr(), "device_scope": "a"*32}
+    assert upload(client, auth, item).status_code == 200
+    base = HEALTH + "/pressure"
+    request = {k: item[k] for k in ("source", "data_origin", "device_scope")}
+    research = {"granted": True, "policy_version": "pressure-research-v1"}
+    checkin = {"granted": True, "policy_version": "pressure-checkin-v1"}
+    endpoint = base + "/research/evaluate"
+    assert client.put(base+"/research/consent", headers=auth, json=research).status_code == 403
+    assert client.put(base+"/consent", headers=auth, json=checkin).status_code == 200
+    assert client.post(endpoint, headers=auth, json=request).status_code == 403
+    assert client.put(base+"/research/consent", headers=auth, json=research).status_code == 200
+    result = client.post(endpoint, headers=auth, json=request)
+    assert result.status_code == 200, result.text
+    assert result.json()["status"] == "insufficient_data"
+    assert not result.json()["deployable"]
+    assert client.post(endpoint, headers=other, json=request).status_code == 403
+    assert client.put(base+"/consent", headers=auth,
+                      json={**checkin, "granted": False}).status_code == 200
+    assert not client.get(base+"/research/consent", headers=auth).json()["granted"]
+    assert client.post(endpoint, headers=auth, json=request).status_code == 403

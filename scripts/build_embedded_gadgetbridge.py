@@ -144,6 +144,7 @@ def prepare(dest):
                  'item { Text("活动与机器人为演示；穿戴数据请在「我的」读取。", color = Moss, fontSize = 12.sp) }',
                  'item { HealthOverviewCard(onManage = { tab = 3 }) }\n'
                  '                        item { Text("活动与机器人为演示。", color = Moss, fontSize = 12.sp) }')
+    shutil.copytree(source / "companion", target / "companion")
     shutil.copytree(ROOT / "apps/gadgetbridge-embedded/src", target / "integration/embedded")
     test_target = dest / "app/src/test/java" / PACKAGE / "integration/embedded"
     test_target.mkdir(parents=True, exist_ok=True)

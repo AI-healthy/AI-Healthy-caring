@@ -1,5 +1,4 @@
 """Consent-gated stream summaries; no mixing of devices or inferred measurements."""
-import json
 from contextlib import closing
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -101,9 +100,9 @@ def _sleep(rows, start, end, issues):
     )
 
 
-def _latest(rows, start, end):
+def _latest(rows, start, day_end, now):
     return max(
-        (r for r in rows if r.value is not None and start <= r.observed_at <= end),
+        (r for r in rows if r.value is not None and start <= r.observed_at < day_end and r.observed_at <= now),
         key=lambda r: (r.observed_at, r.client_sample_id), default=None,
     )
 
@@ -118,8 +117,11 @@ def summarize(db, user, source, origin, scope, timezone, day, now):
     local_day = day or now.astimezone(zone).date()
     if local_day > now.astimezone(zone).date():
         raise StoreError(422, "Cannot summarize future dates")
+    if local_day < date(1970, 1, 2):
+        raise StoreError(422, "Date outside supported observation range")
     start = datetime.combine(local_day, time.min, zone).astimezone(UTC)
-    end = min(now, datetime.combine(local_day + timedelta(days=1), time.min, zone).astimezone(UTC))
+    day_end = datetime.combine(local_day + timedelta(days=1), time.min, zone).astimezone(UTC)
+    end = min(now, day_end)
     sleep_start = datetime.combine(
         local_day - timedelta(days=1), time(18), zone
     ).astimezone(UTC)
@@ -152,8 +154,8 @@ def summarize(db, user, source, origin, scope, timezone, day, now):
     issues = []
     steps = _steps(groups.get("steps", []), start, end, issues)
     sleep = _sleep(groups.get("sleep_minutes", []), sleep_start, sleep_end, issues)
-    hr = _latest(groups.get("heart_rate_bpm", []), start, end)
-    resting = _latest(groups.get("resting_heart_rate_bpm", []), start, end)
+    hr = _latest(groups.get("heart_rate_bpm", []), start, day_end, now)
+    resting = _latest(groups.get("resting_heart_rate_bpm", []), start, day_end, now)
     return {
         "stream": {"source": source, "data_origin": origin, "device_scope": scope,
                    "metrics": [row["metric"] for row in known]},

@@ -308,3 +308,34 @@ def test_stream_scope_backfill_idempotency(client, monkeypatch):
     assert upload(client, auth, {**scoped, "device_scope": "b" * 32}).status_code == 409
     assert len(client.get(HEALTH + "/observations", headers=auth).json()["items"]) == 1
     assert client.get(HEALTH + "/streams", headers=auth).json()[0]["device_scope"] == "a" * 32
+
+
+def test_daily_summary_midnight_and_overlapping_steps(client, monkeypatch):
+    monkeypatch.setenv("SHIYI_ENABLE_REAL_HEALTH", "1")
+    _, auth = account(client)
+    assert real_consent(client, auth, "steps").status_code == 200
+    assert real_consent(client, auth).status_code == 200
+    scope = "a" * 32
+    origin = "test.app"
+    base = {"is_demo": False, "data_origin": origin, "device_scope": scope}
+    before = NOW - timedelta(hours=17)
+    midnight = NOW - timedelta(hours=16)
+    rows = [
+        sample(**{**base, "client_sample_id": "s1", "observed_at": before.isoformat(),
+                  "interval_start": (before - timedelta(minutes=30)).isoformat()}),
+        sample(**{**base, "client_sample_id": "s2",
+                  "observed_at": (before + timedelta(minutes=10)).isoformat(),
+                  "interval_start": (before - timedelta(minutes=20)).isoformat()}),
+        sample(**{**base, "client_sample_id": "hr-before", "metric": "heart_rate_bpm",
+                  "value": 71, "interval_start": None, "observed_at": before.isoformat()}),
+        sample(**{**base, "client_sample_id": "hr-midnight", "metric": "heart_rate_bpm",
+                  "value": 90, "interval_start": None, "observed_at": midnight.isoformat()}),
+    ]
+    assert upload(client, auth, *rows).status_code == 200
+    params = {"source": "health_connect", "data_origin": origin, "device_scope": scope,
+              "timezone": "Asia/Shanghai", "day": "2026-11-14"}
+    result = client.get(HEALTH + "/summary", headers=auth, params=params)
+    assert result.status_code == 200, result.text
+    assert result.json()["heart_rate_bpm"] == 71
+    assert result.json()["steps"] is None
+    assert "steps_overlap" in result.json()["issues"]

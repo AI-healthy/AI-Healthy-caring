@@ -66,8 +66,8 @@ def prepare(dest):
                  "apply plugin: 'org.jetbrains.kotlin.plugin.compose'")
     replace_once(gradle, 'applicationId "nodomain.freeyourgadget.gadgetbridge"',
                  'applicationId "org.aihealthy.shiyi.embedded"')
-    replace_once(gradle, 'versionName "0.83.0"', 'versionName "0.83.0-shiyi-health-dashboard"')
-    replace_once(gradle, "versionCode 235", "versionCode 240")
+    replace_once(gradle, 'versionName "0.83.0"', 'versionName "0.83.0-shiyi-wearable-data"')
+    replace_once(gradle, "versionCode 235", "versionCode 241")
     replace_once(gradle, "compileSdk 34", "compileSdk 35")
     replace_once(gradle, "minSdkVersion 21", "minSdkVersion 26")
     replace_once(gradle, "        aidl true", "        compose true\n        aidl true")

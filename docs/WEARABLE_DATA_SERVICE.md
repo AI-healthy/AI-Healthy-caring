@@ -13,3 +13,9 @@
 - health_summary.summarize(db, ...) 可由后续明确授权的 Harness 上下文工具在同一事务中调用。此阶段不改变原有推荐策略，不把原始生理数据发给模型，也不输出压力诊断。
 
 联调先调用既有授权及上传接口，再查询 streams 和 summary。前端/机器人使用各自经授权的后端调用链，不应共享用户访问令牌。
+
+## Android 适配器
+
+EmbeddedBandReader 是统一 WearableReader 入口，保留已真机验证的 Honor Band 4 原始 HuaweiActivitySample 适配；新增小米手环 4/5/6 的 HuamiBandReader，依据固定上游 FetchActivityOperation 每分钟写入 MiBandActivitySample 的行为读取原始 DAO，不使用图表补点。心率过滤无效值，步数为分钟区间，睡眠只使用显式深/浅睡眠分类；不推断缺失或延续睡眠状态。后者尚需逐型号真机验证。未实现的设备仍仅发现/连接，不转换健康记录。
+
+每个嵌入式设备在本地设备偏好中持久化随机 device_scope；同一条历史样本保留既有 id，升级后可通过重传补齐标识。不同安装生成不同 stream，不跨安装合并。旧 Health Connect 适配器仍无可信的硬件级标识，不进入 scoped 汇总。

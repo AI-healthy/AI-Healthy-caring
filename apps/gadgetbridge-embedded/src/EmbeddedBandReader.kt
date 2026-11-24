@@ -25,9 +25,10 @@ class EmbeddedBandReader(private val band: GBDevice) : WearableReader {
         const val ORIGIN = "org.aihealthy.shiyi.embedded"
 
         fun bands(): List<GBDevice> = GBApplication.app().deviceManager.devices
-            .filter { it.deviceCoordinator is HonorBand4Coordinator }
+            .filter { supports(it) }
 
-        fun supports(band: GBDevice): Boolean = band.deviceCoordinator is HonorBand4Coordinator
+        fun supports(band: GBDevice): Boolean = band.deviceCoordinator is HonorBand4Coordinator ||
+            HuamiBandReader.supports(band)
 
         fun sync(band: GBDevice) {
             check(band.deviceCoordinator.supportsActivityDataFetching()) { "Device does not support history sync" }
@@ -35,6 +36,8 @@ class EmbeddedBandReader(private val band: GBDevice) : WearableReader {
             GBApplication.deviceService(band).onFetchRecordedData(RecordedDataTypes.TYPE_ACTIVITY)
         }
     }
+
+    private val scope by lazy { WearableDeviceScope.get(band) }
 
     private fun id(metric: HealthMetric, start: Long, end: Long, rawSource: Int): String {
         val input = listOf(band.address, metric.wire, start, end, rawSource).joinToString("|")
@@ -48,12 +51,13 @@ class EmbeddedBandReader(private val band: GBDevice) : WearableReader {
         HealthObservation(
             id(metric, start, end, rawSource), metric, value,
             Instant.ofEpochSecond(end), ORIGIN,
-            if (interval) Instant.ofEpochSecond(start) else null, SOURCE
+            if (interval) Instant.ofEpochSecond(start) else null, SOURCE, scope
         )
 
     override suspend fun read(start: Instant, end: Instant): List<HealthObservation> =
         withContext(Dispatchers.IO) {
-            require(supports(band)) { "No verified raw health adapter for this model" }
+            require(supports(band)) { "No raw health adapter for this model" }
+            if (HuamiBandReader.supports(band)) return@withContext HuamiBandReader(band).read(start, end)
             require(start < end && Duration.between(start, end) <= Duration.ofDays(7))
             val from = Math.toIntExact(start.epochSecond)
             val until = Math.toIntExact(end.epochSecond)

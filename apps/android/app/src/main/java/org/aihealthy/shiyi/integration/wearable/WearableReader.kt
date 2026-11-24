@@ -17,7 +17,8 @@ data class HealthObservation(
     val observedAt: Instant,
     val origin: String,
     val intervalStart: Instant? = null,
-    val source: String = "health_connect"
+    val source: String = "health_connect",
+    val deviceScope: String? = null
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("client_sample_id", id)
@@ -28,6 +29,7 @@ data class HealthObservation(
         .put("interval_start", intervalStart?.toString() ?: JSONObject.NULL)
         .put("data_origin", origin)
         .put("is_demo", false)
+        .apply { deviceScope?.let { put("device_scope", it) } }
 }
 
 /** Source-independent reader; a future embedded Gadgetbridge driver can implement this. */

@@ -7,7 +7,8 @@
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
-    <application android:usesCleartextTraffic="false" android:allowBackup="false" android:label="时宜"
+    <application android:usesCleartextTraffic="false" android:allowBackup="false" android:label="时宜" android:icon="@mipmap/ic_shiyi_launcher"
+        android:roundIcon="@mipmap/ic_shiyi_launcher"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".integration.healthconnect.HealthPermissionActivity" android:exported="true">

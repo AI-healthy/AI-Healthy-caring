@@ -67,7 +67,7 @@ def prepare(dest):
     replace_once(gradle, 'applicationId "nodomain.freeyourgadget.gadgetbridge"',
                  'applicationId "org.aihealthy.shiyi.embedded"')
     replace_once(gradle, 'versionName "0.83.0"', 'versionName "0.83.0-shiyi-native-pairing"')
-    replace_once(gradle, "versionCode 235", "versionCode 236")
+    replace_once(gradle, "versionCode 235", "versionCode 237")
     replace_once(gradle, "compileSdk 34", "compileSdk 35")
     replace_once(gradle, "minSdkVersion 21", "minSdkVersion 26")
     replace_once(gradle, "        aidl true", "        compose true\n        aidl true")
@@ -90,6 +90,10 @@ def prepare(dest):
                  "    <!-- Used for Bluetooth access -->")
     replace_once(manifest, 'android:label="@string/app_name"\n        android:roundIcon',
                  'android:label="时宜"\n        android:roundIcon')
+    replace_once(manifest, 'android:icon="@mipmap/ic_launcher"',
+                 'android:icon="@mipmap/ic_shiyi_launcher"')
+    replace_once(manifest, 'android:roundIcon="@mipmap/ic_launcher_round"',
+                 'android:roundIcon="@mipmap/ic_shiyi_launcher"')
     replace_once(manifest, 'android:allowBackup="false"',
                  'android:allowBackup="false" android:usesCleartextTraffic="false"')
     replace_once(manifest, '                <category android:name="android.intent.category.LAUNCHER" />',
@@ -104,6 +108,12 @@ def prepare(dest):
                  '            </intent-filter>\n'
                  '        </activity>\n'
                  '        <activity\n            android:name=".activities.ControlCenterv2"')
+
+    icon_rel = Path("res/mipmap-xxxhdpi/ic_shiyi_launcher.webp")
+    icon_source = ROOT / "apps/android/app/src/main" / icon_rel
+    icon_target = dest / "app/src/main" / icon_rel
+    icon_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(icon_source, icon_target)
 
     source = ROOT / "apps/android/app/src/main/java" / PACKAGE
     target = dest / "app/src/main/java" / PACKAGE

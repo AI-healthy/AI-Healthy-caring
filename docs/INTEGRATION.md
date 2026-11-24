@@ -17,15 +17,18 @@ MCP 工具不创建任务、不读取个人记录，不含用户或设备令牌�
 
 ## API 与设备状态
 
-- 用户端：POST /api/v1/devices/commands（session_id, device_id, preset, client_request_id）
-  → GET /api/v1/devices/commands/{command_id}
+- 用户端：POST /api/v1/devices/commands（session_id, device_id, client_request_id,
+  command_type, payload；旧版 preset 仍可用）→ GET /api/v1/devices/commands/{command_id}
 - 设备端：GET /api/v1/devices/{device_id}/pending（无待处理请求时为 null）
   → POST /api/v1/devices/{device_id}/events（独立设备 Bearer token）
 - QUEUED → ACKNOWLEDGED → COMPLETED / FAILED。
   活动结束或命令过期时，未终结命令在访问时标记 CANCELLED / EXPIRED。
-- 命令重复投递可能发生；同一事件 ID 必须重发完全相同的消息；模拟器重启后先查询状态，已 ACK 则直接发送模拟终态。当前仅无副作用的模拟表情，
+- 命令重复投递可能发生；同一事件 ID 必须重发完全相同的消息；模拟器重启后先查询状态，已 ACK 则直接发送模拟终态。
   真机应持久化已执行 command_id，设计物理命令幂等和执行取消。REST 不等于 WebSocket；
   后续适配器可更换传输层，但不应把命令完成理解为用户活动完成。
+- 六类白名单命令、payload 校验、触摸确认/拒绝与离线 spool 见
+  [LAN-02 设备协议](LAN_DEVICE_PROTOCOL.md)；设备能力矩阵见
+  [LAN-01 设备能力](STACKCHAN_DEVICE_PROFILE.md)。当前仍为模拟器，不是 K151 实机。
 - 静态设备白名单来自 SHIYI_DEV_DEVICES；注册账号也能创建独立模拟设备，见 [USER_HEALTH_API.md](USER_HEALTH_API.md)。
   访问时检查当前配置，无真实设备配对或线上认证功能。
 

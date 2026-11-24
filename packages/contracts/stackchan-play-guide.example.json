@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1-draft",
+  "command_id": "cmd-demo-guide-001",
+  "correlation_id": "activity-demo-001",
+  "device_id": "stackchan-example",
+  "type": "PLAY_GUIDE",
+  "payload": {
+    "guide_id": "stretch-5min",
+    "title": "5 分钟肩颈放松",
+    "duration_seconds": 300,
+    "steps": ["坐直", "抬肩", "缓慢转头", "放松"]
+  },
+  "expires_at": "2099-01-01T00:00:00+08:00",
+  "is_demo": true
+}

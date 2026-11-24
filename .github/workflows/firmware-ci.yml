@@ -1,0 +1,26 @@
+name: Firmware CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  stackchan-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('firmware/stackchan/platformio.ini') }}
+      - name: Install PlatformIO
+        run: python -m pip install platformio==6.2.0
+      - name: Build K151 firmware
+        run: pio run -d firmware/stackchan -e stackchan-k151
+      - name: Build K151 self-test
+        run: pio run -d firmware/stackchan -e stackchan-selftest

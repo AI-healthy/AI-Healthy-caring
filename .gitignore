@@ -22,4 +22,8 @@ private_data/
 recordings/
 raw_health_exports/
 
+# Stack-chan firmware
+firmware/stackchan/.pio/
+**/secrets.h
+
 benchmark-results/

@@ -24,6 +24,8 @@ jobs:
         run: node --check src/shiyi_api/workbench_assets/app.js
       - name: HTTP simulator smoke test
         run: bash ../../scripts/demo_backend.sh
+      - name: LAN device runtime demo
+        run: python -m shiyi_api.lan_demo
       - name: Synthetic harness benchmark
         run: |
           for seed in 42 43 44; do

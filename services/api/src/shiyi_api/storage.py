@@ -65,6 +65,7 @@ class SessionStore:
             db.executescript(SCHEMA)
             # Local import prevents the storage/device module import cycle.
             from .device_storage import SCHEMA as device_schema
+            from .device_storage import ensure_schema as ensure_device_schema
             from .harness.proactive import SCHEMA as proactive_schema
             from .harness.repository import SCHEMA as harness_schema
             from .health_storage import SCHEMA as health_schema
@@ -73,6 +74,7 @@ class SessionStore:
             db.executescript(
                 device_schema + identity_schema + health_schema + harness_schema + proactive_schema
             )
+            ensure_device_schema(db)
 
     def connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=5)

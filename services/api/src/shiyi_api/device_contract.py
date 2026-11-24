@@ -13,6 +13,7 @@ Preset = Literal["happy", "neutral", "sleepy"]
 HeadPreset = Literal["nod", "shake", "tilt", "look_around", "greet"]
 CommandType = Literal[
     "SET_EXPRESSION",
+    "SET_FACE",
     "SPEAK_TEXT",
     "PLAY_GUIDE",
     "SHOW_TIMER",
@@ -45,6 +46,21 @@ class ExpressionPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     preset: Preset
+
+
+class SetFacePayload(BaseModel):
+    """Extensible face command: base expression plus optional decorator overlay.
+
+    Decorator names come from the community firmware (heart/shy/sweat/dizzy/...).
+    Unknown values are rejected by the device at MCP-call time, not here, so new
+    overlays can be added without a backend release.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    expression: str = Field(default="neutral", min_length=1, max_length=40)
+    overlay: str | None = Field(default=None, max_length=40)
+    duration_ms: int = Field(default=0, ge=0, le=60000)
 
 
 class SpeakTextPayload(BaseModel):
@@ -84,6 +100,7 @@ class CancelTaskPayload(BaseModel):
 
 PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "SET_EXPRESSION": ExpressionPayload,
+    "SET_FACE": SetFacePayload,
     "SPEAK_TEXT": SpeakTextPayload,
     "PLAY_GUIDE": PlayGuidePayload,
     "SHOW_TIMER": ShowTimerPayload,

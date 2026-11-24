@@ -36,7 +36,8 @@ TLS、短期凭据与限频，本文件不把它们标为已完成。
 
 | `command_type` | `payload` | 设备行为 | 能力依赖 |
 | --- | --- | --- | --- |
-| `SET_EXPRESSION` | `{"preset":"happy\|neutral\|sleepy"}` | 切换表情 | 屏幕 |
+| `SET_EXPRESSION` | `{"preset":"happy\|neutral\|sleepy"}` | 切换基础表情 | 屏幕 |
+| `SET_FACE` | `{"expression":"happy","overlay":"heart","duration_ms":3000}` | 基础表情 + 装饰叠加（可扩展新表情） | 屏幕 / 社区 MCP |
 | `SPEAK_TEXT` | `{"text":"≤200字","emotion":"预设"}` | 字幕/提示音；音频方案待定 | 屏幕 + 扬声器 |
 | `PLAY_GUIDE` | `{"guide_id":"...","title":"...","duration_seconds":30-900,"steps":["..."]}` | 播放引导 + 计时；触摸可提前结束 | 屏幕 + 触摸 |
 | `SHOW_TIMER` | `{"duration_seconds":10-3600,"label":"..."}` | 显示倒计时 | 屏幕 |

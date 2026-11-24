@@ -130,6 +130,33 @@ def test_legacy_preset_field_still_works(client):
     assert body["payload"] == {"preset": "sleepy"}
 
 
+def test_set_face_is_extensible(client):
+    session_id = new_session(client)
+    response = client.post(
+        ROOT + "/commands",
+        headers=USER,
+        json={
+            "session_id": session_id,
+            "device_id": "sim",
+            "client_request_id": "custom-face",
+            "command_type": "SET_FACE",
+            "payload": {
+                "expression": "happy",
+                "overlay": "heart",
+                "duration_ms": 3000,
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["type"] == "SET_FACE"
+    assert body["payload"] == {
+        "expression": "happy",
+        "overlay": "heart",
+        "duration_ms": 3000,
+    }
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -141,6 +168,11 @@ def test_legacy_preset_field_still_works(client):
         {"command_type": "SPEAK_TEXT", "preset": "happy", "payload": {"text": "hi"}},
         {"command_type": "MOVE_HEAD_PRESET", "payload": {"preset": "spin"}},
         {"command_type": "SET_EXPRESSION", "payload": {"preset": "happy", "extra": 1}},
+        {"command_type": "SET_FACE", "payload": {"expression": ""}},
+        {"command_type": "SET_FACE", "payload": {"expression": "happy",
+                                                  "duration_ms": 60001}},
+        {"command_type": "SET_FACE", "payload": {"expression": "happy",
+                                                  "unknown": "x"}},
         {"command_type": "NOT_A_COMMAND", "payload": {}},
     ],
 )

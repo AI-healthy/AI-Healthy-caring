@@ -196,6 +196,18 @@ class OfficialStackChan:
         kind = command.type
         payload = command.payload
 
+        if kind == "SET_FACE":
+            calls = [
+                McpCall(
+                    "self.face.expression",
+                    {"expression": payload.get("expression", "neutral")},
+                )
+            ]
+            overlay = payload.get("overlay")
+            if overlay:
+                calls.append(McpCall("self.face.overlay", {"name": overlay}))
+            return calls
+
         if kind == "MOVE_HEAD_PRESET":
             preset = payload.get("preset")
             call = HEAD_PROFILE.get(preset)

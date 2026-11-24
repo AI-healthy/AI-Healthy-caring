@@ -10,6 +10,7 @@
   },
   "tools": {
     "SET_EXPRESSION": [{"tool": "self.face.expression", "arguments": {"expression": "{preset}"}}],
+    "SET_FACE": [{"tool": "self.face.expression", "arguments": {"expression": "{expression}"}}],
     "SPEAK_TEXT": [{"tool": "self.audio_speaker.play_text", "arguments": {"text": "{text}"}}],
     "PLAY_GUIDE": [
       {"tool": "self.face.expression", "arguments": {"expression": "thinking"}},

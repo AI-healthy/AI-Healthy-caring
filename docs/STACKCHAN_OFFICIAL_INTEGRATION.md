@@ -184,5 +184,6 @@ WebSocket 或轮询方案。
 - 装饰（decorators）：`angry / dizzy / heart / shy / sweat`，社区固件可映射为
   `self.face.overlay`；
 - 当前 MCP 适配层已有 `OfficialStackChan.show_overlay(name)`，可直接调用；
-- 建议后续在设备契约里增加 `SET_FACE`（`expression` + `overlay` + `duration_ms`），
-  与 xu 同步后实现；若要画全新五官，需要固件侧新增 `self.face.set_expression(JSON)` 工具。
+- **已实现** `SET_FACE` 命令：`{"expression":"happy","overlay":"heart","duration_ms":3000}`；
+  适配层依次调用 `self.face.expression` 与 `self.face.overlay`，未知 overlay 由固件返回错误；
+- 若要画全新五官（而非装饰叠加），需要固件侧新增 `self.face.set_expression(ExpressionData JSON)` 工具。

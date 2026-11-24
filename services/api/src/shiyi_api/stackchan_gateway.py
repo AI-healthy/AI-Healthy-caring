@@ -89,7 +89,7 @@ class StackChanGateway:
             return max(3, len(payload.get("text", "")) // 6)
         if command.type == "MOVE_HEAD_PRESET":
             return 2
-        if command.type == "SET_EXPRESSION":
+        if command.type in {"SET_EXPRESSION", "SET_FACE"}:
             return 1
         return 0
 

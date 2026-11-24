@@ -53,6 +53,8 @@ def estimate_seconds(command: CommandView) -> int:
     payload = command.payload
     if kind == "SET_EXPRESSION":
         return 1
+    if kind == "SET_FACE":
+        return 1
     if kind == "MOVE_HEAD_PRESET":
         return 2
     if kind == "SPEAK_TEXT":

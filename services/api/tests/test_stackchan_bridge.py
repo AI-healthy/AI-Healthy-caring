@@ -77,6 +77,23 @@ def test_cancel_and_unknown_inputs():
         bridge.plan(command("SET_EXPRESSION", {"preset": "angry"}))
 
 
+def test_set_face_expression_and_overlay():
+    transport = RecordingTransport()
+    bridge = OfficialStackChan(transport)
+
+    calls = bridge.plan(
+        command("SET_FACE", {"expression": "happy", "overlay": "heart"})
+    )
+
+    assert calls == [
+        McpCall("self.face.expression", {"expression": "happy"}),
+        McpCall("self.face.overlay", {"name": "heart"}),
+    ]
+    assert bridge.plan(command("SET_FACE", {"expression": "sad"})) == [
+        McpCall("self.face.expression", {"expression": "sad"})
+    ]
+
+
 def test_profile_override():
     transport = RecordingTransport()
     bridge = OfficialStackChan(

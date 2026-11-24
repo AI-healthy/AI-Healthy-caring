@@ -66,8 +66,8 @@ def prepare(dest):
                  "apply plugin: 'org.jetbrains.kotlin.plugin.compose'")
     replace_once(gradle, 'applicationId "nodomain.freeyourgadget.gadgetbridge"',
                  'applicationId "org.aihealthy.shiyi.embedded"')
-    replace_once(gradle, 'versionName "0.83.0"', 'versionName "0.83.0-shiyi-scan-diagnostics"')
-    replace_once(gradle, "versionCode 235", "versionCode 238")
+    replace_once(gradle, 'versionName "0.83.0"', 'versionName "0.83.0-shiyi-multi-device"')
+    replace_once(gradle, "versionCode 235", "versionCode 239")
     replace_once(gradle, "compileSdk 34", "compileSdk 35")
     replace_once(gradle, "minSdkVersion 21", "minSdkVersion 26")
     replace_once(gradle, "        aidl true", "        compose true\n        aidl true")
@@ -114,6 +114,14 @@ def prepare(dest):
     icon_target = dest / "app/src/main" / icon_rel
     icon_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(icon_source, icon_target)
+
+    # Android advertisements can contain a name before BluetoothDevice caches it.
+    candidate = dest / "app/src/main/java/nodomain/freeyourgadget/gadgetbridge/impl/GBDeviceCandidate.java"
+    replace_once(candidate, "    public boolean isNameKnown() {",
+                 "    public void setShiYiAdvertisedName(String name) {\\n"
+                 "        if (name != null && !name.isEmpty()) deviceName = name;\\n"
+                 "    }\\n\\n"
+                 "    public boolean isNameKnown() {")
 
     source = ROOT / "apps/android/app/src/main/java" / PACKAGE
     target = dest / "app/src/main/java" / PACKAGE

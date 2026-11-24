@@ -25,7 +25,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withTimeoutOrNull
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager
-import nodomain.freeyourgadget.gadgetbridge.devices.huawei.honorband4.HonorBand4Coordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceType
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import org.aihealthy.shiyi.core.network.HealthApiClient
 import org.aihealthy.shiyi.integration.wearable.HealthMetric
@@ -48,9 +49,14 @@ fun WearablePanel() {
     var scanError by remember { mutableStateOf("") }
     var manualAddress by remember { mutableStateOf("") }
     var showManual by remember { mutableStateOf(false) }
+    var manualModel by remember { mutableStateOf<DeviceType?>(null) }
+    var modelMenu by remember { mutableStateOf(false) }
+    var modelQuery by remember { mutableStateOf("") }
+    var pairingTarget by remember { mutableStateOf<GBDevice?>(null) }
+    var pairingKey by remember { mutableStateOf("") }
     var pendingAddress by remember { mutableStateOf<String?>(null) }
     var chosenAddress by remember { mutableStateOf<String?>(null) }
-    var status by remember { mutableStateOf("开启蓝牙，搜索并选择附近的荣耀手环 4。") }
+    var status by remember { mutableStateOf("开启蓝牙，搜索并选择附近的智能穿戴设备。") }
     var busy by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<List<HealthObservation>>(emptyList()) }
     var server by remember { mutableStateOf("") }
@@ -103,7 +109,7 @@ fun WearablePanel() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == GBDevice.ACTION_DEVICE_CHANGED) {
                     val device = intent.getParcelableExtra<GBDevice>(GBDevice.EXTRA_DEVICE)
-                    if (device != null && device.deviceCoordinator is HonorBand4Coordinator) {
+                    if (device != null && device.type.isSupported) {
                         states[device.address] = connection.state(device)
                     }
                 }
@@ -147,10 +153,10 @@ fun WearablePanel() {
             found[it.address] = it
         }
         scanning = true
-        status = "正在搜索附近的荣耀手环 4…"
+        status = "正在搜索附近的智能穿戴设备…"
         scanJob = scope.launch {
             try {
-                withTimeoutOrNull(25000L) {
+                withTimeoutOrNull(30000L) {
                     connection.scan().collect { event ->
                         seen[event.address] = true
                         event.match?.let { found[it.address] = it }
@@ -158,7 +164,7 @@ fun WearablePanel() {
                 }
                 status = if (found.isEmpty() && bands.isEmpty())
                     if (seen.isEmpty()) "未收到任何 BLE 广播，请检查系统权限、定位开关与蓝牙状态。"
-                    else "收到附近设备广播，但未匹配到荣耀手环 4。请断开其他连接或手动输入地址。"
+                    else "收到附近设备广播，但未匹配到受支持的设备。请断开其他连接或手动输入地址。"
                     else "请选择要连接的手环。"
             } catch (e: CancellationException) {
                 throw e
@@ -171,7 +177,7 @@ fun WearablePanel() {
         }
     }
 
-    fun connectBand(device: GBDevice) {
+    fun connectBand(device: GBDevice, systemBond: Boolean = false, authKey: String = "") {
         scanJob?.cancel()
         chosenAddress = device.address
         preview = emptyList()
@@ -179,7 +185,7 @@ fun WearablePanel() {
             pendingAddress = device.address
             status = "正在连接并认证；如果手环显示确认请求，请在手环上确认。"
             try {
-                connection.connect(device)
+                connection.connect(device, systemBond, authKey)
                 val ready = withTimeoutOrNull(90000L) {
                     while (states[device.address]?.ready != true) {
                         delay(400)
@@ -195,10 +201,44 @@ fun WearablePanel() {
         }
     }
 
+    pairingTarget?.let { target ->
+        val kind = connection.pairingKind(target)
+        AlertDialog(
+            onDismissRequest = { pairingTarget = null; pairingKey = "" },
+            title = { Text("连接 " + target.name) },
+            text = {
+                Column {
+                    Text(if (kind == DeviceCoordinator.BONDING_STYLE_REQUIRE_KEY)
+                        "该型号需要你从合法设备账户取得的认证密钥。密钥仅保存在本机驱动配置。"
+                        else "该型号支持系统配对，也可以尝试直接连接。")
+                    if (kind == DeviceCoordinator.BONDING_STYLE_REQUIRE_KEY) {
+                        OutlinedTextField(value = pairingKey, onValueChange = { pairingKey = it },
+                            label = { Text("设备认证密钥") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation())
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = kind != DeviceCoordinator.BONDING_STYLE_REQUIRE_KEY || pairingKey.isNotBlank(),
+                    onClick = {
+                        val key = pairingKey
+                        pairingKey = ""; pairingTarget = null
+                        connectBand(target, true, key)
+                    }) { Text("系统配对并连接") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pairingTarget = null; pairingKey = ""
+                    if (kind == DeviceCoordinator.BONDING_STYLE_ASK) connectBand(target, false)
+                }) { Text(if (kind == DeviceCoordinator.BONDING_STYLE_ASK) "直接连接" else "取消") }
+            }
+        )
+    }
+
     Card {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("智能穿戴", style = MaterialTheme.typography.titleMedium)
-            Text("连接荣耀手环 4，查看心率、活动和睡眠记录。")
+            Text("搜索支持的手环、手表等设备；健康指标按设备适配能力提供。")
             if (scanning) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
                 OutlinedButton(onClick = {
@@ -224,15 +264,36 @@ fun WearablePanel() {
                     Text(if (showManual) "收起手动连接" else "找不到设备？手动输入蓝牙地址")
                 }
                 if (showManual) {
-                    Text("仅输入自己的荣耀手环 4 的蓝牙 MAC 地址。手动添加后再点击连接。")
+                    Text("输入自己的设备蓝牙地址；无法自动识别时，请选择实际型号。")
                     OutlinedTextField(value = manualAddress, onValueChange = { manualAddress = it },
                         label = { Text("蓝牙 MAC 地址") }, singleLine = true,
                         modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = modelQuery, onValueChange = {
+                        modelQuery = it; modelMenu = true
+                    }, label = { Text("搜索型号（可选）") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth())
+                    Box {
+                        OutlinedButton(onClick = { modelMenu = true }) {
+                            Text(manualModel?.let { connection.modelLabel(it) } ?: "自动识别 / 选择型号")
+                        }
+                        DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
+                            DropdownMenuItem(text = { Text("自动识别") }, onClick = {
+                                manualModel = null; modelMenu = false
+                            })
+                            connection.models().filter {
+                                connection.modelLabel(it).contains(modelQuery, true) || it.name.contains(modelQuery, true)
+                            }.forEach { model ->
+                                DropdownMenuItem(text = { Text(connection.modelLabel(model)) }, onClick = {
+                                    manualModel = model; modelMenu = false
+                                })
+                            }
+                        }
+                    }
                     Button(enabled = manualAddress.isNotBlank(), onClick = {
                         if (!connection.hasPermissions()) permissionLauncher.launch(connection.permissions())
                         else {
                             try {
-                                val band = connection.manual(manualAddress)
+                                val band = connection.manual(manualAddress, manualModel)
                                 found[band.address] = band
                                 status = "已添加待连接设备，请点击连接手环。"
                             } catch (_: Exception) {
@@ -251,7 +312,7 @@ fun WearablePanel() {
                 val state = states[address]
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(state?.name ?: candidate?.name ?: known?.name ?: "荣耀手环 4",
+                        Text(state?.name ?: candidate?.name ?: known?.name ?: "智能穿戴设备",
                             style = MaterialTheme.typography.titleSmall)
                         Text(when {
                             state?.ready == true -> if (state.busy) "同步中" else "已连接"
@@ -260,6 +321,10 @@ fun WearablePanel() {
                             else -> "附近设备"
                         } + (candidate?.takeIf { it.rssi != -1 }?.let { " · 信号 " + it.rssi + " dBm" } ?: ""))
                         if (device != null) {
+                            Text(connection.modelLabel(device.type), style = MaterialTheme.typography.bodySmall)
+                            if (!connection.supportsNativePairing(device)) {
+                                Text("已识别：该型号需要专用配对适配，或仅支持扫描。")
+                            }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (state?.ready == true) {
                                     OutlinedButton(enabled = !busy, onClick = {
@@ -272,8 +337,15 @@ fun WearablePanel() {
                                         chosenAddress = address; preview = emptyList()
                                     }) { Text(if (chosenAddress == address) "已选择" else "选择") }
                                 } else {
-                                    Button(enabled = !busy && state?.connecting != true,
-                                        onClick = { connectBand(device) }) { Text("连接手环") }
+                                    Button(enabled = !busy && state?.connecting != true &&
+                                        connection.supportsNativePairing(device),
+                                        onClick = {
+                                            val kind = connection.pairingKind(device)
+                                            if (known == null && (kind == DeviceCoordinator.BONDING_STYLE_ASK ||
+                                                    kind == DeviceCoordinator.BONDING_STYLE_REQUIRE_KEY)) {
+                                                pairingTarget = device; pairingKey = ""
+                                            } else connectBand(device)
+                                        }) { Text("连接设备") }
                                 }
                             }
                         }
@@ -283,13 +355,16 @@ fun WearablePanel() {
             val selected = bands.firstOrNull { it.address == chosenAddress }
             val selectedState = chosenAddress?.let { states[it] }
             Button(enabled = !busy && !scanning && selected != null &&
-                selectedState?.ready == true && !selectedState.busy, onClick = {
+                selectedState?.ready == true && !selectedState.busy &&
+                selected.deviceCoordinator.supportsActivityDataFetching(), onClick = {
                 execute {
                     val band = connection.known().first { it.address == chosenAddress }
                     EmbeddedBandReader.sync(band)
                     status = "已请求同步；同步完成后点击读取最近七天。"
                 }
             }) { Text("同步手环历史数据") }
+            val hasReader = selected?.let { EmbeddedBandReader.supports(it) } == true
+            if (selected != null && !hasReader) Text("此设备可连接；时宜健康数据转换适配尚未开放。")
             Row {
                 Checkbox(checked = allowed, enabled = !busy, onCheckedChange = {
                     allowed = it
@@ -297,10 +372,10 @@ fun WearablePanel() {
                 })
                 Text("同意在此页面读取所选手环的本地健康记录")
             }
-            Button(enabled = !busy && !scanning && selected != null && allowed && selectedState?.busy != true, onClick = {
+            Button(enabled = !busy && !scanning && selected != null && hasReader && allowed && selectedState?.busy != true, onClick = {
                 preview = emptyList()
                 execute {
-                    val band = EmbeddedBandReader.bands().first { it.address == chosenAddress }
+                    val band = connection.known().first { it.address == chosenAddress }
                     val end = Instant.now()
                     preview = EmbeddedBandReader(band).read(end.minus(7, ChronoUnit.DAYS), end)
                     status = if (preview.isEmpty()) "暂无有效记录，先完成设备同步。"

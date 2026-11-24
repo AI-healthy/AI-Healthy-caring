@@ -27,7 +27,10 @@ class EmbeddedBandReader(private val band: GBDevice) : WearableReader {
         fun bands(): List<GBDevice> = GBApplication.app().deviceManager.devices
             .filter { it.deviceCoordinator is HonorBand4Coordinator }
 
+        fun supports(band: GBDevice): Boolean = band.deviceCoordinator is HonorBand4Coordinator
+
         fun sync(band: GBDevice) {
+            check(band.deviceCoordinator.supportsActivityDataFetching()) { "Device does not support history sync" }
             check(band.isInitialized && !band.isBusy) { "Band must be ready and idle" }
             GBApplication.deviceService(band).onFetchRecordedData(RecordedDataTypes.TYPE_ACTIVITY)
         }
@@ -50,6 +53,7 @@ class EmbeddedBandReader(private val band: GBDevice) : WearableReader {
 
     override suspend fun read(start: Instant, end: Instant): List<HealthObservation> =
         withContext(Dispatchers.IO) {
+            require(supports(band)) { "No verified raw health adapter for this model" }
             require(start < end && Duration.between(start, end) <= Duration.ofDays(7))
             val from = Math.toIntExact(start.epochSecond)
             val until = Math.toIntExact(end.epochSecond)

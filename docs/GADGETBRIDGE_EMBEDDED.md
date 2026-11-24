@@ -45,4 +45,8 @@ CI 编译成功只是工程验证；必须以真实 Honor Band 4 完成配对、
 
 ## 原生配对交互
 
-NativeBandConnection 使用 Android BLE 扫描（12 秒，离开页面时取消），只接受 Honor Band 4 名称前缀。该型号在固定上游的 HuaweiLECoordinator 中明确使用 BONDING_STYLE_NONE：首次连接直接调用 GBApplication.deviceService(device).connect(true)，已记录设备使用 connect(false)。通过上游本地设备状态广播更新 Compose；只有 isInitialized 才显示连接成功。连接超时不伪造成功，不自动删除绑定记录。保留系统权限及手环端确认。真机验收：从时宜入口扫描、连接、同步和读取均不跳转至 Gadgetbridge Activity。
+NativeBandConnection 使用 30 秒 BLE 与经典蓝牙发现，按固定上游 DeviceHelper.resolveDeviceType(candidate, false) 识别所有注册真实型号（排除 UNKNOWN、TEST、SCANNABLE、BLE_GATT_CLIENT 等通用/测试入口），离开页面取消扫描。该型号在固定上游的 HuaweiLECoordinator 中明确使用 BONDING_STYLE_NONE：首次连接直接调用 GBApplication.deviceService(device).connect(true)，已记录设备使用 connect(false)。通过上游本地设备状态广播更新 Compose；只有 isInitialized 才显示连接成功。连接超时不伪造成功，不自动删除绑定记录。保留系统权限及手环端确认。真机验收：从时宜入口扫描、连接、同步和读取均不跳转至 Gadgetbridge Activity。
+
+## 多设备接入
+
+扫描匹配采用完整上游协调器注册表，合并广播名称、服务 UUID 和已绑定设备；按地址独立列出设备，可逐个发起连接、切换选择与断开。手动地址未知时必须明确选择实际型号，不能自动套用 Honor 4。通用原生配对处理 NONE/LAZY、BOND、ASK 和 REQUIRE_KEY（显式输入、原生系统配对），已有设备可重连。专用配对 Activity 的新设备标记为需要独立适配，不跳转第三方 UI。识别与连接能力不等于数据适配：目前仅 Honor Band 4 的原始健康记录转换已实现，其他型号允许驱动支持的历史同步但不直接转换或上传未核实数据。多设备同时连接能力由硬件、Android 和驱动决定，需真机验证。

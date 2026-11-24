@@ -26,6 +26,9 @@ jobs:
           java-version: '17'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: 'false'
       - name: Install Android platform and build tools
         run: |
           sdkmanager --version
@@ -43,3 +46,18 @@ jobs:
         run: |
           find app/build/outputs/apk/mainline/debug -name '*.apk' -type f -print
           test -n "$(find app/build/outputs/apk/mainline/debug -name '*.apk' -type f -print -quit)"
+      - name: Package corresponding source
+        run: |
+          mkdir -p "$RUNNER_TEMP/shiyi-artifacts"
+          tar --exclude=.git --exclude=.gradle --exclude=build --exclude=local.properties \
+            -czf "$RUNNER_TEMP/shiyi-artifacts/shiyi-embedded-source.tar.gz" \
+            -C "$RUNNER_TEMP/shiyi-embedded" .
+          cp "$RUNNER_TEMP/shiyi-embedded"/app/build/outputs/apk/mainline/debug/*.apk "$RUNNER_TEMP/shiyi-artifacts/"
+          cd "$RUNNER_TEMP/shiyi-artifacts"
+          sha256sum *.apk *.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shiyi-embedded-debug
+          path: ${{ runner.temp }}/shiyi-artifacts/
+          if-no-files-found: error
+          retention-days: 7

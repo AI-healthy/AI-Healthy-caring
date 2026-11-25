@@ -1,6 +1,8 @@
 """StackChan text chat with Moark or a local OpenAI-compatible model."""
 import json
 import os
+from collections import deque
+from time import monotonic
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -13,6 +15,7 @@ from .auth import current_user
 
 router = APIRouter(prefix="/api/v1/companion", tags=["companion"])
 _capacity = anyio.CapacityLimiter(2)
+_guest_requests: deque[float] = deque()
 _message_text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=800)]
 _system_prompt = """你是时宜 App 里的 StackChan，亲切但不撒娇过头，跟随用户的语言简短回答。
 你可以陪用户聊天、听他们说，或在用户愿意时提议休息、散步、做个短呼吸练习。
@@ -119,7 +122,28 @@ async def _complete_chat(
                503: {"description": "Model disabled"}, 504: {"description": "Model timed out"}},
 )
 async def chat(payload: ChatRequest, _user: Annotated[str, Depends(current_user)]) -> ChatReply:
-    address, model, api_key = _model_config()
+    return await _request_model(payload, *_model_config())
+
+
+@router.post("/guest-chat", response_model=ChatReply)
+async def guest_chat(payload: ChatRequest) -> ChatReply:
+    if os.environ.get("SHIYI_COMPANION_GUEST_ENABLED") != "1":
+        raise HTTPException(503, "Guest chat is disabled")
+    config = _model_config()
+    if config[2] is None:
+        raise HTTPException(503, "Guest chat requires Moark")
+    now = monotonic()
+    while _guest_requests and now - _guest_requests[0] >= 60:
+        _guest_requests.popleft()
+    if len(_guest_requests) >= 12:
+        raise HTTPException(429, "Guest chat limit reached", headers={"Retry-After": "60"})
+    _guest_requests.append(now)
+    return await _request_model(payload, *config)
+
+
+async def _request_model(
+    payload: ChatRequest, address: str, model: str, api_key: str | None
+) -> ChatReply:
     try:
         _capacity.acquire_nowait()
     except anyio.WouldBlock:

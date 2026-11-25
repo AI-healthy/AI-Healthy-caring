@@ -80,6 +80,8 @@ def prepare(dest):
                  "    implementation 'androidx.compose.foundation:foundation'\n"
                  "    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'")
     with gradle.open("a", encoding="utf-8") as f:
+        f.write("\nandroid.defaultConfig.manifestPlaceholders.shiyiChatOrigin = "
+                "System.getenv('SHIYI_CHAT_ORIGIN') ?: ''\n")
         f.write("\nandroid { kotlinOptions { jvmTarget = '1.8' } }\n"
                 "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {\n"
                 "    dependsOn(\":GBDaoGenerator:genSources\")\n}\n")
@@ -88,6 +90,14 @@ def prepare(dest):
     replace_once(manifest, "    <!-- Used for Bluetooth access -->",
                  '    <uses-permission android:name="android.permission.INTERNET" />\n'
                  "    <!-- Used for Bluetooth access -->")
+    if 'android:name="android.permission.VIBRATE"' not in manifest.read_text(encoding="utf-8"):
+        replace_once(manifest, "    <!-- Used for Bluetooth access -->",
+                     '    <uses-permission android:name="android.permission.VIBRATE" />\n'
+                     "    <!-- Used for Bluetooth access -->")
+    replace_once(manifest, '        <activity\n            android:name=".activities.ControlCenterv2"',
+                 '        <meta-data android:name="org.aihealthy.shiyi.CHAT_ORIGIN"'
+                 ' android:value="${shiyiChatOrigin}" />\n'
+                 '        <activity\n            android:name=".activities.ControlCenterv2"')
     replace_once(manifest, 'android:label="@string/app_name"\n        android:roundIcon',
                  'android:label="时宜"\n        android:roundIcon')
     replace_once(manifest, 'android:icon="@mipmap/ic_launcher"',

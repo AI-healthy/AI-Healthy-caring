@@ -7,6 +7,7 @@ android {
     namespace = "org.aihealthy.shiyi"
     compileSdk = 36
     defaultConfig {
+        manifestPlaceholders["shiyiChatOrigin"] = System.getenv("SHIYI_CHAT_ORIGIN").orEmpty()
         applicationId = "org.aihealthy.shiyi"
         minSdk = 26
         targetSdk = 35

@@ -60,16 +60,13 @@ internal fun HomeStackChan(modifier: Modifier, onChat: () -> Unit) {
                 onClick = {
                     val now = SystemClock.uptimeMillis()
                     val rapidTap = lastTap >= 0 && now - lastTap <= 360
-                    view.performHapticFeedback(
-                        if (rapidTap) HapticFeedbackConstants.CONTEXT_CLICK
-                        else HapticFeedbackConstants.CLOCK_TICK
-                    )
+                    view.vibrateStackChan(if (rapidTap) 42 else 26)
                     motion = if (rapidTap) PetMotion.Cheer else PetMotion.Greeting
                     replay++
                     lastTap = if (rapidTap) -1L else now
                 },
                 onLongClick = {
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    view.vibrateStackChan(55)
                     motion = PetMotion.Shy
                     replay++
                     lastTap = -1L

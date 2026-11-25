@@ -39,6 +39,8 @@ jobs:
           python3 -m py_compile scripts/build_embedded_gadgetbridge.py
           python3 scripts/build_embedded_gadgetbridge.py --dest "$RUNNER_TEMP/shiyi-embedded"
       - name: Compile embedded APK
+        env:
+          SHIYI_CHAT_ORIGIN: ${{ vars.SHIYI_CHAT_ORIGIN }}
         working-directory: ${{ runner.temp }}/shiyi-embedded
         run: bash ./gradlew :app:assembleMainlineDebug --no-daemon --stacktrace
       - name: Test daily health aggregation

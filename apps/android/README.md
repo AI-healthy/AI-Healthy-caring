@@ -21,8 +21,10 @@ Android Studio 打开 `apps/android`。首页活动与 Stack-chan 仍为静态�
 设置后，时宜后端向 Moark 的 `https://api.moark.com/v1/chat/completions` 请求
 `ds-flash`，请求会携带本轮和最近四轮聊天文字。请使用部署环境的密钥配置。
 如需使用本机 Ollama，可清除上述变量并设置 `SHIYI_COMPANION_MODEL`。
-手机的「对话设置」填可达的时宜 API HTTPS 地址和已有的时宜登录令牌，
-与穿戴接口使用同一身份验证。开发联调也可使用 `SHIYI_DEV_USERS` 配置的测试令牌。
+部署端设置 `SHIYI_COMPANION_GUEST_ENABLED=1` 来开放免配置对话。
+构建 APK 时设置公开的 `SHIYI_CHAT_ORIGIN` 为已部署的时宜 HTTPS 服务地址。
+App 自动请求 `POST /api/v1/companion/guest-chat`，无需输入地址、令牌或模型密钥。
+体验服务每进程每分钟限 12 次，建议以单 worker 运行；模型密钥通过部署环境注入。
 
 `POST /api/v1/companion/chat` 请求格式为
 `{"messages":[{"role":"user","content":"今天有点累，陪我聊聊吧"}]}`。

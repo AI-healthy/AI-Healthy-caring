@@ -1,5 +1,7 @@
 package org.aihealthy.shiyi.companion
 
+import android.content.Context
+import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -12,12 +14,21 @@ internal class CompanionChatException(message: String) : Exception(message)
 internal data class ChatTurn(val user: String, val assistant: String)
 internal data class CompanionReply(val text: String, val reaction: PetMotion)
 
-internal class CompanionChatClient(origin: String, private val token: String) {
+internal class CompanionChatClient(origin: String) {
     private val endpoint = URI(origin.trim()).also {
         require(it.scheme == "https" && it.host != null && it.userInfo == null &&
             it.query == null && it.fragment == null && (it.path.isEmpty() || it.path == "/"))
-        require(token.length in 16..512 && token.all { c -> c.code in 33..126 })
-    }.resolve("/api/v1/companion/chat").toURL()
+    }.resolve("/api/v1/companion/guest-chat").toURL()
+
+    companion object {
+        fun fromApp(context: Context): CompanionChatClient? {
+            val info = context.packageManager.getApplicationInfo(
+                context.packageName, PackageManager.GET_META_DATA
+            )
+            val origin = info.metaData?.getString("org.aihealthy.shiyi.CHAT_ORIGIN").orEmpty()
+            return runCatching { CompanionChatClient(origin) }.getOrNull()
+        }
+    }
 
     suspend fun send(history: List<ChatTurn>, message: String): CompanionReply =
         withContext(Dispatchers.IO) {
@@ -33,14 +44,13 @@ internal class CompanionChatClient(origin: String, private val token: String) {
                 connection.instanceFollowRedirects = false
                 connection.connectTimeout = 10_000
                 connection.readTimeout = 40_000
-                connection.setRequestProperty("Authorization", "Bearer " + token)
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 connection.doOutput = true
                 val body = JSONObject().put("messages", messages).toString()
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 when (connection.responseCode) {
                     200 -> Unit
-                    401 -> throw CompanionChatException("登录令牌无效或已过期，请重新设置。")
+                    401 -> throw CompanionChatException("聊天服务暂未开放。")
                     429 -> throw CompanionChatException("StackChan 正在忙，稍等一下再发送。")
                     502, 503, 504 -> throw CompanionChatException("暂时连不上对话模型，可以稍后重试。")
                     else -> throw CompanionChatException("对话服务暂时不可用。")

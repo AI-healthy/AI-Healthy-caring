@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -39,9 +38,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -49,7 +48,6 @@ import kotlinx.coroutines.launch
 
 internal class CompanionSession {
     val history = mutableStateListOf<ChatTurn>()
-    var client by mutableStateOf<CompanionChatClient?>(null)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -93,15 +91,13 @@ internal fun StackChanCompanion(session: CompanionSession, modifier: Modifier = 
     }
 
     if (chatOpen) {
+        val context = LocalContext.current
+        val client = remember(context) { CompanionChatClient.fromApp(context) }
         BackHandler { chatOpen = false }
         CompanionChat(
             modifier = modifier,
             history = session.history,
-            client = session.client,
-            onConnect = {
-                session.history.clear()
-                session.client = it
-            },
+            client = client,
             onClose = { chatOpen = false }
         )
     } else {
@@ -119,16 +115,15 @@ internal fun StackChanCompanion(session: CompanionSession, modifier: Modifier = 
                     onLongClickLabel = "摸摸 StackChan 的头",
                     onClick = {
                         if (!openChatAfterGreeting) {
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            view.vibrateStackChan(26)
                             motion = PetMotion.Greeting
                             replay++
                             openChatAfterGreeting = true
                         }
                     },
                     onLongClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         if (!openChatAfterGreeting) {
-                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            view.vibrateStackChan(55)
                             motion = PetMotion.Shy
                             replay++
                         }
@@ -176,7 +171,6 @@ private fun CompanionChat(
     modifier: Modifier,
     history: MutableList<ChatTurn>,
     client: CompanionChatClient?,
-    onConnect: (CompanionChatClient) -> Unit,
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -184,14 +178,13 @@ private fun CompanionChat(
     var draft by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var configuring by remember { mutableStateOf(false) }
     var reaction by remember { mutableStateOf(PetMotion.Idle) }
     var replay by remember { mutableIntStateOf(0) }
 
     fun send(message: String) {
         if (message.isBlank() || pending != null) return
         if (client == null) {
-            configuring = true
+            error = "聊天服务暂未配置，请使用已配置的版本。"
             return
         }
         val context = history.takeLast(4)
@@ -235,9 +228,7 @@ private fun CompanionChat(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onClose) { Text("返回") }
             Text("StackChan", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-            TextButton(enabled = pending == null, onClick = { configuring = true }) {
-                Text("对话设置")
-            }
+
         }
         StackChanFace(
             modifier = Modifier.fillMaxWidth().height(80.dp),
@@ -289,16 +280,6 @@ private fun CompanionChat(
             }
         }
     }
-    if (configuring) {
-        ChatSettings(
-            onDismiss = { configuring = false },
-            onConnect = {
-                onConnect(it)
-                configuring = false
-                error = null
-            }
-        )
-    }
 }
 
 @Composable
@@ -313,33 +294,4 @@ private fun ChatBubble(text: String, mine: Boolean) {
             Text(text, Modifier.padding(12.dp))
         }
     }
-}
-
-@Composable
-private fun ChatSettings(onDismiss: () -> Unit, onConnect: (CompanionChatClient) -> Unit) {
-    var address by remember { mutableStateOf("") }
-    var token by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("连接时宜对话服务") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("发送时会把本轮文字和最近四轮对话交给时宜服务上的模型。")
-                OutlinedTextField(address, { address = it }, label = { Text("时宜 HTTPS 地址") },
-                    singleLine = true)
-                OutlinedTextField(token, { token = it }, label = { Text("时宜登录令牌") },
-                    visualTransformation = PasswordVisualTransformation(), singleLine = true)
-                if (error) Text("请输入有效的 HTTPS 地址和登录令牌。",
-                    color = MaterialTheme.colorScheme.error)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val client = runCatching { CompanionChatClient(address, token.trim()) }.getOrNull()
-                if (client == null) error = true else onConnect(client)
-            }) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
-    )
 }

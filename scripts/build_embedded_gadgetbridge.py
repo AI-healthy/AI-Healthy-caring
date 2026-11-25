@@ -80,6 +80,8 @@ def prepare(dest):
                  "    implementation 'androidx.compose.foundation:foundation'\n"
                  "    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'")
     with gradle.open("a", encoding="utf-8") as f:
+        f.write("\nandroid.defaultConfig.manifestPlaceholders.shiyiChatOrigin = "
+                "System.getenv('SHIYI_CHAT_ORIGIN') ?: ''\n")
         f.write("\nandroid { kotlinOptions { jvmTarget = '1.8' } }\n"
                 "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {\n"
                 "    dependsOn(\":GBDaoGenerator:genSources\")\n}\n")
@@ -88,6 +90,14 @@ def prepare(dest):
     replace_once(manifest, "    <!-- Used for Bluetooth access -->",
                  '    <uses-permission android:name="android.permission.INTERNET" />\n'
                  "    <!-- Used for Bluetooth access -->")
+    if 'android:name="android.permission.VIBRATE"' not in manifest.read_text(encoding="utf-8"):
+        replace_once(manifest, "    <!-- Used for Bluetooth access -->",
+                     '    <uses-permission android:name="android.permission.VIBRATE" />\n'
+                     "    <!-- Used for Bluetooth access -->")
+    replace_once(manifest, '        <activity\n            android:name=".activities.ControlCenterv2"',
+                 '        <meta-data android:name="org.aihealthy.shiyi.CHAT_ORIGIN"'
+                 ' android:value="${shiyiChatOrigin}" />\n'
+                 '        <activity\n            android:name=".activities.ControlCenterv2"')
     replace_once(manifest, 'android:label="@string/app_name"\n        android:roundIcon',
                  'android:label="时宜"\n        android:roundIcon')
     replace_once(manifest, 'android:icon="@mipmap/ic_launcher"',
@@ -115,6 +125,11 @@ def prepare(dest):
     icon_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(icon_source, icon_target)
 
+    wallpaper = Path("res/drawable-nodpi/shiyi_home_landscape.webp")
+    wallpaper_target = dest / "app/src/main" / wallpaper
+    wallpaper_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "apps/android/app/src/main" / wallpaper, wallpaper_target)
+
     # Android advertisements can contain a name before BluetoothDevice caches it.
     candidate = dest / "app/src/main/java/nodomain/freeyourgadget/gadgetbridge/impl/GBDeviceCandidate.java"
     replace_once(candidate, "    public boolean isNameKnown() {",
@@ -125,7 +140,7 @@ def prepare(dest):
 
     source = ROOT / "apps/android/app/src/main/java" / PACKAGE
     target = dest / "app/src/main/java" / PACKAGE
-    for name in ("MainActivity.kt", "integration/wearable/WearableReader.kt",
+    for name in ("MainActivity.kt", "ShiYiHome.kt", "integration/wearable/WearableReader.kt",
                  "core/network/HealthApiClient.kt"):
         out = target / name
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -141,9 +156,13 @@ def prepare(dest):
     replace_once(target / "MainActivity.kt", "setContent { ShiYiApp() }",
                  "setContent { HealthDashboardHost(this) { ShiYiApp() } }")
     replace_once(target / "MainActivity.kt",
-                 'item { Text("活动与机器人为演示；穿戴数据请在「我的」读取。", color = Moss, fontSize = 12.sp) }',
-                 'item { HealthOverviewCard(onManage = { tab = 3 }) }\n'
-                 '                        item { Text("活动与机器人为演示。", color = Moss, fontSize = 12.sp) }')
+                 '5 -> item { WearablePanel() }',
+                 '5 -> {\n'
+                 '                        item { HealthOverviewCard(onManage = { tab = 3 }) }\n'
+                 '                        item { WearablePanel() }\n'
+                 '                    }')
+    replace_once(target / "ShiYiHome.kt", "import java.time.LocalDate",
+                 "import java.time.LocalDate\nimport nodomain.freeyourgadget.gadgetbridge.R")
     shutil.copytree(source / "companion", target / "companion")
     shutil.copytree(ROOT / "apps/gadgetbridge-embedded/src", target / "integration/embedded")
     test_target = dest / "app/src/test/java" / PACKAGE / "integration/embedded"

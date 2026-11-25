@@ -105,3 +105,26 @@ def test_moark_uses_fixed_endpoint_and_server_credential(monkeypatch, client):
     response = client.post("/api/v1/companion/chat", headers=AUTH, json={"messages": MESSAGES})
     assert response.status_code == 200
     assert response.json() == {"reply": "我在。", "reaction": "calm"}
+
+
+def test_guest_chat_needs_no_user_token_and_limits_requests(monkeypatch, client):
+    from collections import deque
+
+    from shiyi_api import companion_api
+
+    endpoint = "/api/v1/companion/guest-chat"
+    monkeypatch.delenv("SHIYI_COMPANION_GUEST_ENABLED", raising=False)
+    assert client.post(endpoint, json={"messages": MESSAGES}).status_code == 503
+    monkeypatch.setenv("SHIYI_COMPANION_GUEST_ENABLED", "1")
+    monkeypatch.setenv("SHIYI_COMPANION_MOARK_API_KEY", "test-provider-key")
+    monkeypatch.setattr(companion_api, "_guest_requests", deque())
+
+    async def model(payload, address, name, api_key):
+        assert name == "ds-flash"
+        assert api_key == "test-provider-key"
+        return companion_api.ChatReply(reply="我在。", reaction="calm")
+
+    monkeypatch.setattr(companion_api, "_complete_chat", model)
+    for _ in range(12):
+        assert client.post(endpoint, json={"messages": MESSAGES}).status_code == 200
+    assert client.post(endpoint, json={"messages": MESSAGES}).status_code == 429

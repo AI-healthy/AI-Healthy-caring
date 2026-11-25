@@ -1,6 +1,8 @@
 package org.aihealthy.shiyi.companion
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
@@ -28,7 +30,9 @@ internal enum class PetMotion {
 @Composable
 internal fun StackChanFace(modifier: Modifier, motion: PetMotion, replay: Int = 0) {
     var animatedPose by remember { mutableStateOf(false) }
+    val jump = remember { Animatable(0f) }
     LaunchedEffect(motion, replay) {
+        jump.snapTo(0f)
         animatedPose = false
         when (motion) {
             PetMotion.Idle, PetMotion.Thinking -> {
@@ -40,11 +44,20 @@ internal fun StackChanFace(modifier: Modifier, motion: PetMotion, replay: Int = 
                     animatedPose = false
                 }
             }
-            PetMotion.Greeting, PetMotion.Shy, PetMotion.Nod, PetMotion.Cheer -> {
+            PetMotion.Cheer -> jump.animateTo(0f, keyframes {
+                durationMillis = 660
+                0f at 0
+                5f at 95
+                -17f at 290
+                0f at 510
+                3f at 580
+                0f at 660
+            })
+            PetMotion.Greeting, PetMotion.Shy, PetMotion.Nod -> {
                 animatedPose = true
                 delay(260)
                 animatedPose = false
-                if (motion == PetMotion.Greeting || motion == PetMotion.Cheer) {
+                if (motion == PetMotion.Greeting) {
                     delay(160)
                     animatedPose = true
                     delay(240)
@@ -66,11 +79,7 @@ internal fun StackChanFace(modifier: Modifier, motion: PetMotion, replay: Int = 
         animationSpec = tween(230), label = "tilt"
     )
     val headY by animateFloatAsState(
-        targetValue = when {
-            motion == PetMotion.Nod && animatedPose -> 7f
-            motion == PetMotion.Cheer && animatedPose -> -12f
-            else -> 0f
-        },
+        targetValue = if (motion == PetMotion.Nod && animatedPose) 7f else 0f,
         animationSpec = tween(230), label = "bounce"
     )
     val breath by animateFloatAsState(
@@ -93,82 +102,96 @@ internal fun StackChanFace(modifier: Modifier, motion: PetMotion, replay: Int = 
             if (motion == PetMotion.Inhale || motion == PetMotion.Exhale) {
                 drawCircle(pink.copy(alpha = 0.2f), 64f + breath * 32f, Offset(120f, 93f))
             }
-            drawOval(Color(0x24512B3B), Offset(51f, 174f), Size(140f, 14f))
-            drawRoundRect(Color(0xFF9C6179), Offset(102f, 132f), Size(37f, 29f),
-                CornerRadius(8f))
-            val footTop = Brush.verticalGradient(
-                listOf(Color(0xFFFFDCE4), Color(0xFFD997AD)), 150f, 170f
-            )
-            for (x in listOf(61f, 127f)) {
-                drawRoundRect(Color(0xFF84546A), Offset(x, 157f), Size(54f, 22f),
-                    CornerRadius(8f))
-                drawRoundRect(footTop, Offset(x, 150f), Size(54f, 21f), CornerRadius(8f))
+            val lift = (-jump.value).coerceAtLeast(0f)
+            val compression = jump.value.coerceAtLeast(0f) / 115f
+            for (center in listOf(88f, 154f)) {
+                val width = 52f - lift * 0.6f
+                drawOval(
+                    Color(0xFF512B3B).copy(alpha = 0.16f - lift * 0.004f),
+                    Offset(center - width / 2, 175f),
+                    Size(width, 10f)
+                )
             }
-
-            withTransform({ translate(0f, headY); rotate(tilt, Offset(120f, 140f)) }) {
-                drawRoundRect(Brush.verticalGradient(
-                    listOf(Color(0xFFDA9BB2), Color(0xFF92546D)), 29f, 144f
-                ), Offset(54f, 29f), Size(146f, 116f), CornerRadius(24f))
-                drawRoundRect(Brush.linearGradient(
-                    listOf(Color(0xFFFFF1F0), Color(0xFFE5A2B8)), Offset(49f, 32f),
-                    Offset(178f, 147f)
-                ), Offset(43f, 30f), Size(144f, 116f), CornerRadius(23f))
-                drawRoundRect(Color(0x90FFF8F7), Offset(45f, 32f), Size(140f, 112f),
-                    CornerRadius(21f), style = Stroke(1.5f))
-                for (y in listOf(73f, 81f, 89f)) {
-                    drawLine(Color(0xFF834C63), Offset(191f, y), Offset(195f, y),
-                        strokeWidth = 2f, cap = StrokeCap.Round)
-                }
-                drawRoundRect(Brush.verticalGradient(
-                    listOf(Color(0xFF473D51), Color(0xFF25212D)), 40f, 121f
-                ), Offset(52f, 39f), Size(126f, 82f), CornerRadius(15f))
-                drawLine(Color(0x30FFFFFF), Offset(67f, 46f), Offset(156f, 46f),
-                    strokeWidth = 1.6f, cap = StrokeCap.Round)
-                for (x in listOf(84f, 115f, 146f)) {
-                    drawRoundRect(Color(0xFFBD7D95), Offset(x - 8f, 129f), Size(16f, 9f),
-                        CornerRadius(4f))
-                    drawRoundRect(Color(0xFFFFEBEE), Offset(x - 8f, 127f), Size(16f, 8f),
-                        CornerRadius(4f))
+            withTransform({
+                translate(0f, -lift)
+                scale(1f + compression / 2f, 1f - compression, Offset(121f, 179f))
+            }) {
+                drawRoundRect(Color(0xFF9C6179), Offset(102f, 132f), Size(37f, 29f),
+                    CornerRadius(8f))
+                val footTop = Brush.verticalGradient(
+                    listOf(Color(0xFFFFDCE4), Color(0xFFD997AD)), 150f, 170f
+                )
+                for (x in listOf(61f, 127f)) {
+                    drawRoundRect(Color(0xFF84546A), Offset(x, 157f), Size(54f, 22f),
+                        CornerRadius(8f))
+                    drawRoundRect(footTop, Offset(x, 150f), Size(54f, 21f), CornerRadius(8f))
                 }
 
-                val happy = motion == PetMotion.Cheer
-                val shy = motion == PetMotion.Shy
-                val greeting = motion == PetMotion.Greeting
-                val eyesClosed = motion == PetMotion.Calm || (motion == PetMotion.Idle && animatedPose)
-                for (x in listOf(88f, 142f)) {
-                    if (eyesClosed || happy || shy) {
-                        val eye = Path().apply {
-                            moveTo(x - 7f, 80f)
-                            quadraticBezierTo(x, if (happy || shy) 67f else 86f, x + 7f, 80f)
-                        }
-                        drawPath(eye, face, style = Stroke(3.5f, cap = StrokeCap.Round))
-                    } else {
-                        val eyeHeight = if (greeting) 20f else 15f
-                        drawRoundRect(face, Offset(x - 5f, 80f - eyeHeight), Size(10f, eyeHeight),
-                            CornerRadius(5f))
+                withTransform({ translate(0f, headY); rotate(tilt, Offset(120f, 140f)) }) {
+                    drawRoundRect(Brush.verticalGradient(
+                        listOf(Color(0xFFDA9BB2), Color(0xFF92546D)), 29f, 144f
+                    ), Offset(54f, 29f), Size(146f, 116f), CornerRadius(24f))
+                    drawRoundRect(Brush.linearGradient(
+                        listOf(Color(0xFFFFF1F0), Color(0xFFE5A2B8)), Offset(49f, 32f),
+                        Offset(178f, 147f)
+                    ), Offset(43f, 30f), Size(144f, 116f), CornerRadius(23f))
+                    drawRoundRect(Color(0x90FFF8F7), Offset(45f, 32f), Size(140f, 112f),
+                        CornerRadius(21f), style = Stroke(1.5f))
+                    for (y in listOf(73f, 81f, 89f)) {
+                        drawLine(Color(0xFF834C63), Offset(191f, y), Offset(195f, y),
+                            strokeWidth = 2f, cap = StrokeCap.Round)
                     }
-                    if (shy || happy) drawOval(pink, Offset(x - 8f, 88f), Size(15f, 6f))
-                }
-                when {
-                    motion == PetMotion.Thinking -> {
-                        for (index in 0..2) {
-                            val dim = index == if (animatedPose) 0 else 2
-                            drawCircle(face.copy(alpha = if (dim) 0.35f else 1f),
-                                2f, Offset(107f + index * 8f, 97f))
-                        }
+                    drawRoundRect(Brush.verticalGradient(
+                        listOf(Color(0xFF473D51), Color(0xFF25212D)), 40f, 121f
+                    ), Offset(52f, 39f), Size(126f, 82f), CornerRadius(15f))
+                    drawLine(Color(0x30FFFFFF), Offset(67f, 46f), Offset(156f, 46f),
+                        strokeWidth = 1.6f, cap = StrokeCap.Round)
+                    for (x in listOf(84f, 115f, 146f)) {
+                        drawRoundRect(Color(0xFFBD7D95), Offset(x - 8f, 129f), Size(16f, 9f),
+                            CornerRadius(4f))
+                        drawRoundRect(Color(0xFFFFEBEE), Offset(x - 8f, 127f), Size(16f, 8f),
+                            CornerRadius(4f))
                     }
-                    happy || shy || greeting -> {
-                        val smile = Path().apply {
-                            moveTo(107f, 93f)
-                            quadraticBezierTo(115f, 104f, 123f, 93f)
+
+                    val happy = motion == PetMotion.Cheer
+                    val shy = motion == PetMotion.Shy
+                    val greeting = motion == PetMotion.Greeting
+                    val eyesClosed = motion == PetMotion.Calm || (motion == PetMotion.Idle && animatedPose)
+                    for (x in listOf(88f, 142f)) {
+                        if (eyesClosed || happy || shy) {
+                            val eye = Path().apply {
+                                moveTo(x - 7f, 80f)
+                                quadraticBezierTo(x, if (happy || shy) 67f else 86f, x + 7f, 80f)
+                            }
+                            drawPath(eye, face, style = Stroke(3.5f, cap = StrokeCap.Round))
+                        } else {
+                            val eyeHeight = if (greeting) 20f else 15f
+                            drawRoundRect(face, Offset(x - 5f, 80f - eyeHeight), Size(10f, eyeHeight),
+                                CornerRadius(5f))
                         }
-                        drawPath(smile, face, style = Stroke(3.3f, cap = StrokeCap.Round))
+                        if (shy || happy) drawOval(pink, Offset(x - 8f, 88f), Size(15f, 6f))
                     }
-                    motion == PetMotion.Inhale || motion == PetMotion.Exhale ->
-                        drawCircle(face, 2f + breath * 3f, Offset(115f, 96f),
-                            style = Stroke(2f))
-                    else -> drawLine(face, Offset(108f, 96f), Offset(122f, 96f),
-                        strokeWidth = 3.5f, cap = StrokeCap.Round)
+                    when {
+                        motion == PetMotion.Thinking -> {
+                            for (index in 0..2) {
+                                val dim = index == if (animatedPose) 0 else 2
+                                drawCircle(face.copy(alpha = if (dim) 0.35f else 1f),
+                                    2f, Offset(107f + index * 8f, 97f))
+                            }
+                        }
+                        happy || shy || greeting -> {
+                            val smile = Path().apply {
+                                moveTo(107f, 93f)
+                                quadraticBezierTo(115f, 104f, 123f, 93f)
+                            }
+                            drawPath(smile, face, style = Stroke(3.3f, cap = StrokeCap.Round))
+                        }
+                        motion == PetMotion.Inhale || motion == PetMotion.Exhale ->
+                            drawCircle(face, 2f + breath * 3f, Offset(115f, 96f),
+                                style = Stroke(2f))
+                        else -> drawLine(face, Offset(108f, 96f), Offset(122f, 96f),
+                            strokeWidth = 3.5f, cap = StrokeCap.Round)
+                    }
                 }
             }
         }

@@ -40,7 +40,7 @@ internal fun HomeStackChan(modifier: Modifier, onChat: () -> Unit) {
         if (!pressed) {
             if (motion == PetMotion.Idle) {
                 delay(if (idleAction == 0) 6200 else 9200)
-                motion = listOf(PetMotion.Greeting, PetMotion.Cheer, PetMotion.Calm)[idleAction % 3]
+                motion = if (idleAction % 3 == 2) PetMotion.Calm else PetMotion.Nod
                 idleAction++
             } else {
                 delay(if (motion == PetMotion.Calm) 1700 else 1150)

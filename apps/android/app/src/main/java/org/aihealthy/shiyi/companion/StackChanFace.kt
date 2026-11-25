@@ -93,14 +93,17 @@ internal fun StackChanFace(modifier: Modifier, motion: PetMotion, replay: Int = 
             if (motion == PetMotion.Inhale || motion == PetMotion.Exhale) {
                 drawCircle(pink.copy(alpha = 0.2f), 64f + breath * 32f, Offset(120f, 93f))
             }
-            drawOval(Color(0x24512B3B), Offset(53f, 174f), Size(136f, 14f))
-            drawRoundRect(Color(0xFF84546A), Offset(66f, 153f), Size(110f, 23f),
-                CornerRadius(11f))
-            drawRoundRect(Brush.verticalGradient(
-                listOf(Color(0xFFFFDCE4), Color(0xFFD997AD)), 149f, 166f
-            ), Offset(66f, 149f), Size(110f, 18f), CornerRadius(9f))
-            drawRoundRect(Color(0xFF9C6179), Offset(102f, 132f), Size(37f, 25f),
+            drawOval(Color(0x24512B3B), Offset(51f, 174f), Size(140f, 14f))
+            drawRoundRect(Color(0xFF9C6179), Offset(102f, 132f), Size(37f, 29f),
                 CornerRadius(8f))
+            val footTop = Brush.verticalGradient(
+                listOf(Color(0xFFFFDCE4), Color(0xFFD997AD)), 150f, 170f
+            )
+            for (x in listOf(61f, 127f)) {
+                drawRoundRect(Color(0xFF84546A), Offset(x, 157f), Size(54f, 22f),
+                    CornerRadius(8f))
+                drawRoundRect(footTop, Offset(x, 150f), Size(54f, 21f), CornerRadius(8f))
+            }
 
             withTransform({ translate(0f, headY); rotate(tilt, Offset(120f, 140f)) }) {
                 drawRoundRect(Brush.verticalGradient(
